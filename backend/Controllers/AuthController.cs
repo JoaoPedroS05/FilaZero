@@ -1,8 +1,12 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using backend.Data;
 using backend.DTOs;
 using backend.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 namespace backend.Controllers
 {
@@ -11,10 +15,12 @@ namespace backend.Controllers
     public class AuthController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IConfiguration _configuration;
 
-        public AuthController(DataContext context)
+        public AuthController(DataContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         [HttpPost("register")]
@@ -43,6 +49,48 @@ namespace backend.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Usuário cadastrado com sucesso!" });
+        }
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto request)
+        {
+            // 1. Busca o usuário pelo e-mail
+            var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == request.Email);
+            
+            // 2. Valida o usuário e a senha criptografada (Critério: Mensagem de erro para login inválido)
+            if (usuario == null || !BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
+            {
+                return Unauthorized(new { message = "E-mail ou senha inválidos." });
+            }
+
+            // 3. Gera o Token JWT
+            var token = GerarTokenJwt(usuario);
+
+            return Ok(new { 
+                token = token, 
+                usuario = new { usuario.Id, usuario.Nome, usuario.Email } 
+            });
+        }
+
+        private string GerarTokenJwt(Usuario usuario)
+        {
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var chave = Encoding.ASCII.GetBytes(_configuration["JwtSettings:Secret"]!);
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+                    new Claim(ClaimTypes.Name, usuario.Nome),
+                    new Claim(ClaimTypes.Email, usuario.Email)
+                }),
+                Expires = DateTime.UtcNow.AddMinutes(double.Parse(_configuration["JwtSettings:ExpiryInMinutes"]!)),
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)
+            };
+
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }
