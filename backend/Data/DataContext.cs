@@ -9,6 +9,8 @@ namespace backend.Data
 
         public DbSet<Usuario> Usuarios { get; set; }
 
+        public DbSet<Fila> Filas { get; set; }
+        
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
