@@ -1,7 +1,9 @@
 using backend.Data;
 using backend.DTOs;
+using backend.Hubs;
 using backend.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
@@ -13,10 +15,12 @@ namespace backend.Controllers
     public class FilaController : ControllerBase
     {
         private readonly DataContext _context;
+        private readonly IHubContext<FilaHub> _hubContext;
 
-        public FilaController(DataContext context)
+        public FilaController(DataContext context, IHubContext<FilaHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         // 1. Endpoint para criar uma nova fila
@@ -33,6 +37,7 @@ namespace backend.Controllers
 
             _context.Filas.Add(novaFila);
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync("FilaCriada");
 
             return Ok(new { message = "Fila de atendimento criada com sucesso!", fila = novaFila });
         }
@@ -102,6 +107,7 @@ namespace backend.Controllers
 
             _context.Atendimentos.Add(novoAtendimento);
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync("AtualizarFila", request.FilaId);
 
             return Ok(new
             {
