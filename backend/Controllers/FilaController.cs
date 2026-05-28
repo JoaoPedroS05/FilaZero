@@ -160,6 +160,53 @@ namespace backend.Controllers
 
             return Ok(atendimentosAtivos);
         }
+
+        [HttpPost("chamar-proxima")]
+        // [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ChamarProximaSenha([FromBody] EntrarFilaDto request)
+        {
+            // 1. Buscar o próximo atendimento com status "Aguardando" para a fila informada (ordenado por data/ID)
+            var proximoAtendimento = await _context.Atendimentos
+                .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando")
+                .OrderBy(a => a.DataHoraEntrada)
+                .FirstOrDefaultAsync();
+
+            if (proximoAtendimento == null)
+            {
+                return NotFound(new { message = "Não há nenhuma senha aguardando nesta fila." });
+            }
+
+            // 2. Mudar o status para "Chamado"
+            proximoAtendimento.Status = "Chamado";
+            proximoAtendimento.DataHoraAtendimento = DateTime.UtcNow;
+
+            // 3. Atualizar a posição de TODOS os outros que ainda estão esperando nessa fila (subtrair 1)
+            var restantes = await _context.Atendimentos
+                .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando")
+                .ToListAsync();
+
+            foreach (var atendimento in restantes)
+            {
+                if (atendimento.Posicao > 0)
+                {
+                    atendimento.Posicao -= 1;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            // 4. Notificar TODOS os conectados via SignalR
+            // O evento "SenhaChamada" envia o número da senha e o ID da fila que andou
+            await _hubContext.Clients.All.SendAsync("SenhaChamada", new { 
+                senha = proximoAtendimento.Senha, 
+                filaId = request.FilaId 
+            });
+            
+            // Também disparamos o "AtualizarFila" para atualizar as posições na tela dos clientes
+            await _hubContext.Clients.All.SendAsync("AtualizarFila", request.FilaId);
+
+            return Ok(new { message = $"Senha {proximoAtendimento.Senha} chamada com sucesso!", atendimento = proximoAtendimento });
+        }
     
     }
 }
