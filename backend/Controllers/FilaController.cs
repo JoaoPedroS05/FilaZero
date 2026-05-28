@@ -161,10 +161,11 @@ namespace backend.Controllers
             return Ok(atendimentosAtivos);
         }
 
-        [HttpPost("chamar-proxima")]
         // [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> ChamarProximaSenha([FromBody] EntrarFilaDto request)
+        [HttpPost("chamar-proxima")]
+        public async Task<IActionResult> ChamarProximaSenha([FromBody] ChamarSenhaDto request)
         {
+            // 1. Buscar o próximo atendimento com status "Aguardando" para a fila informada
             var proximoAtendimento = await _context.Atendimentos
                 .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando")
                 .OrderBy(a => a.DataHoraEntrada)
@@ -175,9 +176,19 @@ namespace backend.Controllers
                 return NotFound(new { message = "Não há nenhuma senha aguardando nesta fila." });
             }
 
+            // 2. Buscar o guichê para podermos mandar o nome/número dele no painel do cliente
+            var guiche = await _context.Guiches.FindAsync(request.GuicheId);
+            if (guiche == null || !guiche.Ativo)
+            {
+                return BadRequest(new { message = "O guichê selecionado não está ativo ou não existe." });
+            }
+
+            // 3. Vincular o guichê e mudar o status para "Chamado"
             proximoAtendimento.Status = "Chamado";
+            proximoAtendimento.GuicheId = request.GuicheId;
             proximoAtendimento.DataHoraAtendimento = DateTime.UtcNow;
 
+            // 4. Atualizar a posição de todos os outros que ainda estão esperando
             var restantes = await _context.Atendimentos
                 .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando")
                 .ToListAsync();
@@ -192,14 +203,16 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
+            // 5. Notificar via SignalR incluindo o local exato do guichê para onde o cliente deve ir!
             await _hubContext.Clients.All.SendAsync("SenhaChamada", new { 
                 senha = proximoAtendimento.Senha, 
-                filaId = request.FilaId 
+                filaId = request.FilaId,
+                guicheNome = guiche.NumeroOuNome 
             });
             
             await _hubContext.Clients.All.SendAsync("AtualizarFila", request.FilaId);
 
-            return Ok(new { message = $"Senha {proximoAtendimento.Senha} chamada com sucesso!", atendimento = proximoAtendimento });
+            return Ok(new { message = $"Senha {proximoAtendimento.Senha} chamada no {guiche.NumeroOuNome}!", atendimento = proximoAtendimento });
         }
 
         // 3. Endpoint de Cálculo Preditivo de Locomoção (Híbrido: Google Maps Matrix + Fallback Haversine)
