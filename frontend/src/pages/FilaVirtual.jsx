@@ -99,7 +99,11 @@ export default function FilaVirtual() {
         novaConexao.on('AtualizarFila', () => carregarDados());
         novaConexao.on('FilaCriada', () => carregarDados());
         novaConexao.on('SenhaChamada', (dados) => {
-          setAlertaChamada(dados.senha);
+          setAlertaChamada({
+            senha: dados.senha,
+            guicheNome: dados.guicheNome || 'Guichê Padrão'
+          });    
+          // Limpa o banner após 7 segundos
           setTimeout(() => setAlertaChamada(null), 7000);
         });
       }
@@ -150,15 +154,15 @@ export default function FilaVirtual() {
           <p className="text-slate-500">Pegue sua senha remota e evite aglomerações</p>
         </div>
 
-        {/* Alerta de chamada global */}
+        {/* ANIMAÇÃO DE SENHA CHAMADA */}
         {alertaChamada && (
           <div className="bg-amber-500 text-white p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse border-4 border-amber-400">
             <div className="text-center md:text-left">
-              <p className="text-xs font-black uppercase tracking-widest opacity-90 text-amber-100">💥 Atenção! Sua vez chegou 💥</p>
-              <h2 className="text-6xl font-black mt-1 tracking-tight">{alertaChamada}</h2>
+              <p className="text-xs font-black uppercase tracking-widest opacity-90 text-amber-100">💥 Sua vez chegou! 💥</p>
+              <h2 className="text-6xl font-black mt-1 tracking-tight">{alertaChamada.senha}</h2>
             </div>
-            <div className="bg-white text-amber-600 font-extrabold px-6 py-3 rounded-2xl shadow-md text-sm uppercase tracking-wider animate-bounce">
-              Compareça ao Guichê
+            <div className="bg-white text-amber-600 font-extrabold px-6 py-3 rounded-2xl shadow-md text-sm uppercase tracking-wider animate-bounce text-center">
+              Dirija-se ao <span className="text-slate-900 block text-lg font-black">{alertaChamada.guicheNome}</span>
             </div>
           </div>
         )}

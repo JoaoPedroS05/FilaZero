@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using backend.Data;
 
@@ -11,9 +12,11 @@ using backend.Data;
 namespace backend.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260528194743_SeedGuichesAndAdmin")]
+    partial class SeedGuichesAndAdmin
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -203,7 +206,7 @@ namespace backend.Migrations
                             Email = "admin@filazero.com",
                             Nome = "Administrador Sistema",
                             Role = "Admin",
-                            SenhaHash = "$2a$11$M2XvH17UoJv6N5PkhZEn/.F1A8h9r8Ebe4m8IlyXvA5D3Z7gq7KFe"
+                            SenhaHash = "admin123"
                         });
                 });
 
