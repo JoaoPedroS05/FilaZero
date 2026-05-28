@@ -388,5 +388,28 @@ namespace backend.Controllers
             var guiches = await _context.Guiches.Where(g => g.Ativo).ToListAsync();
             return Ok(guiches);
         }
+
+        // Endpoint para o cliente limpar/finalizar o card chamado da sua tela
+        [HttpPost("finalizar-ticket")]
+        [Authorize]
+        public async Task<IActionResult> FinalizarTicket([FromBody] Dictionary<string, int> request)
+        {
+            if (!request.TryGetValue("atendimentoId", out int atendimentoId))
+            {
+                return BadRequest(new { message = "O ID do atendimento é obrigatório." });
+            }
+
+            var atendimento = await _context.Atendimentos.FindAsync(atendimentoId);
+            if (atendimento == null)
+            {
+                return NotFound(new { message = "Ticket não encontrado." });
+            }
+
+            // Altera o status para tirá-lo do fluxo ativo
+            atendimento.Status = "Finalizado";
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Ticket arquivado com sucesso!" });
+        }
     }
 }

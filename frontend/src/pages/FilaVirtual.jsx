@@ -181,21 +181,23 @@ export default function FilaVirtual() {
                   <div 
                     key={ticket.id} 
                     className={`bg-white rounded-2xl shadow-sm border p-6 flex flex-col justify-between relative overflow-hidden transition-all duration-500 ${
-                      ticket.status === 'Chamado' ? 'border-amber-400 ring-4 ring-amber-500/10' : 'border-blue-100'
+                      ticket.status === 'Chamado' ? 'border-amber-400 ring-4 ring-amber-500/10 bg-amber-50/10' : 'border-blue-100'
                     }`}
                   >
+                    {/* Badge de Status */}
                     <div className={`absolute top-0 right-0 text-white text-xs px-3 py-1 rounded-bl-xl font-bold uppercase tracking-wider ${
                       ticket.status === 'Chamado' ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'
                     }`}>
                       {ticket.status}
                     </div>
 
+                    {/* Informações do Cabeçalho do Card */}
                     <div>
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{ticket.fila.nome}</p>
                       <h3 className={`text-4xl font-black my-2 ${ticket.status === 'Chamado' ? 'text-amber-500' : 'text-blue-600'}`}>{ticket.senha}</h3>
                     </div>
 
-                    {/* --- PAINEL DE GEOLOCALIZAÇÃO PREDITIVA INTELIGENTE --- */}
+                    {/* --- PAINEL DE GEOLOCALIZAÇÃO PREDITIVA --- */}
                     {ticket.status === 'Aguardando' && analise && (
                       <div className={`mt-3 p-3.5 rounded-xl border text-xs font-medium space-y-1 ${
                         analise.deveSairAgora 
@@ -216,11 +218,43 @@ export default function FilaVirtual() {
                       </div>
                     )}
 
+                    {/* --- ÁREA DE AÇÕES DINÂMICAS DO TICKET --- */}
+                    <div className="mt-4">
+                      {ticket.status === 'Aguardando' ? (
+                        /* Cliente quer sair da fila por erro ou desistência */
+                        <button
+                          onClick={() => desistirFila(ticket.fila.id)}
+                          className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer uppercase tracking-wider"
+                        >
+                          Sair da Fila de Espera
+                        </button>
+                      ) : (
+                        /* Ticket já foi recebido/chamado, cliente limpa ele da tela */
+                        <button
+                          onClick={async () => {
+                            try {
+                              // Chamamos um endpoint para mudar o status para "Finalizado"
+                              // Se você não tiver o endpoint estrito, simulamos mudando o status localmente ou batendo na API
+                              await api.post(`/fila/finalizar-ticket`, { atendimentoId: ticket.id });
+                              carregarDados(); // Recarrega para sumir da tela
+                            } catch (err) {
+                              // Fallback temporário caso queira testar antes de mexer no controller:
+                              carregarDados();
+                            }
+                          }}
+                          className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer uppercase tracking-wider shadow-sm text-center block"
+                        >
+                          ✓ Entendi, Limpar Painel
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Rodapé Informativo */}
                     <div className="border-t border-slate-100 pt-4 mt-4 flex justify-between text-sm">
                       <div>
                         <p className="text-slate-400 text-xs">Sua Posição</p>
                         <p className="font-bold text-slate-700">
-                          {ticket.status === 'Chamado' ? '🚨 CHAMADO' : `${ticket.posicao}º lugar`}
+                          {ticket.status === 'Chamado' ? '🚨 NO GUICHÊ' : `${ticket.posicao}º lugar`}
                         </p>
                       </div>
                       <div className="text-right">
@@ -230,6 +264,7 @@ export default function FilaVirtual() {
                         </p>
                       </div>
                     </div>
+
                   </div>
                 );
               })}
