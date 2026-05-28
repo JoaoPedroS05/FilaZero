@@ -17,25 +17,25 @@ export default function AdminDashboard() {
   const [senhaChamada, setSenhaChamada] = useState('');
 
   // Carrega filas e guichês ao montar a tela
-  useEffect(() => {
-    const inicializarPainel = async () => {
-      try {
-        const [resFilas, resGuiches] = await Promise.all([
-          api.get('/fila'),
-          api.get('/fila/guiches') 
-        ]);
-        setFilas(resFilas.data);
-        setGuiches(resGuiches.data);
-        
-        // Pré-seleciona o primeiro guichê da lista se houver algum
-        if (resGuiches.data.length > 0) {
-          setGuicheSelecionado(resGuiches.data[0].id);
-        }
-      } catch (err) {
-        console.error('Erro ao inicializar dados do painel.');
+  const inicializarPainel = async () => {
+    try {
+      const [resFilas, resGuiches] = await Promise.all([
+        api.get('/fila'),
+        api.get('/fila/guiches') 
+      ]);
+      setFilas(resFilas.data);
+      setGuiches(resGuiches.data);
+      
+      // Pré-seleciona o primeiro guichê da lista se houver algum
+      if (resGuiches.data.length > 0 && !guicheSelecionado) {
+        setGuicheSelecionado(resGuiches.data[0].id);
       }
-    };
+    } catch (err) {
+      console.error('Erro ao inicializar dados do painel.');
+    }
+  };
 
+  useEffect(() => {
     inicializarPainel();
   }, []);
 
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
 
       setSuccess('Nova fila criada com localização!');
       setNome(''); setTipoServico(''); setTempoMedio(''); setLatitude(''); setLongitude('');
-      // Recarrega apenas as filas
+      
       const res = await api.get('/fila');
       setFilas(res.data);
     } catch (err) {
@@ -63,7 +63,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Função atualizada para enviar o GuicheId selecionado!
   const chamarProxima = async (filaId) => {
     setError('');
     setSenhaChamada('');
@@ -74,7 +73,6 @@ export default function AdminDashboard() {
     }
 
     try {
-      // Enviando os dados mapeados para o ChamarSenhaDto do .NET
       const response = await api.post('/fila/chamar-proxima', { 
         filaId,
         guicheId: parseInt(guicheSelecionado) 
@@ -82,6 +80,24 @@ export default function AdminDashboard() {
       setSenhaChamada(response.data.atendimento.senha);
     } catch (err) {
       setError(err.response?.data?.message || 'Ninguém aguardando nesta fila.');
+    }
+  };
+
+  // 🔥 NOVA FUNÇÃO: Remove (desativa) a fila logicamente do sistema
+  const handleRemoverFila = async (filaId, nomeFila) => {
+    if (!window.confirm(`AVISO: Deseja mesmo remover a fila "${nomeFila}"? Isso cancelará todos os atendimentos ativos dela.`)) return;
+    
+    setError('');
+    setSuccess('');
+    try {
+      await api.delete(`/fila/${filaId}`);
+      setSuccess(`Fila "${nomeFila}" removida com sucesso!`);
+      
+      // Recarrega as filas atualizadas para refletir a remoção lógica
+      const res = await api.get('/fila');
+      setFilas(res.data);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro ao remover a fila de atendimento.');
     }
   };
 
@@ -128,7 +144,7 @@ export default function AdminDashboard() {
       {/* Coluna 2 e 3: Controle Operacional */}
       <div className="md:col-span-2 space-y-6">
         
-        {/* --- NOVO SELETOR DE GUICHÊ OPERACIONAL --- */}
+        {/* SELETOR DE GUICHÊ OPERACIONAL */}
         <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wide">⚙️ Posto de Trabalho</h3>
@@ -161,7 +177,8 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100">
           <h2 className="text-xl font-black text-slate-900 mb-4">Painel de Chamadas</h2>
           <div className="divide-y divide-slate-100">
-            {filas.map((fila) => (
+            {/* Filtrando para exibir de forma operacional apenas as filas que estão ativas */}
+            {filas.filter(fila => fila.ativa).map((fila) => (
               <div key={fila.id} className="py-4 flex justify-between items-center first:pt-0 last:pb-0">
                 <div>
                   <h3 className="font-bold text-slate-800">{fila.nome}</h3>
@@ -170,12 +187,22 @@ export default function AdminDashboard() {
                     {fila.latitude && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">📍 Localizado</span>}
                   </div>
                 </div>
-                <button
-                  onClick={() => chamarProxima(fila.id)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs tracking-wide cursor-pointer shadow-sm uppercase transition-colors"
-                >
-                  Chamar Próxima
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => chamarProxima(fila.id)}
+                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-4 py-2 rounded-xl text-xs tracking-wide cursor-pointer shadow-sm uppercase transition-colors"
+                  >
+                    Chamar Próxima
+                  </button>
+                  {/* Permite a remoção lógica da fila com confirmação e estilo Tailwind */}
+                  <button
+                    onClick={() => handleRemoverFila(fila.id, fila.nome)}
+                    className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-2.5 rounded-xl text-xs cursor-pointer border border-red-200 transition-colors flex items-center justify-center"
+                    title="Remover Fila"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
           </div>

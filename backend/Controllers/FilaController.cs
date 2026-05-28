@@ -26,7 +26,7 @@ namespace backend.Controllers
             _googleMapsService = googleMapsService;
         }
 
-        // 1. Endpoint para criar uma nova fila
+        // Endpoint para criar uma nova fila
         [HttpPost]
         public async Task<IActionResult> CriarFila([FromBody] CriarFilaDto request)
         {
@@ -47,7 +47,86 @@ namespace backend.Controllers
             return Ok(new { message = "Fila de atendimento criada com sucesso!", fila = novaFila });
         }
 
-        // 2. Endpoint para listar todas as filas
+        // Endpoint para o Admin desativar/remover uma fila
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> RemoverFila(int id)
+        {
+            var fila = await _context.Filas.FindAsync(id);
+            if (fila == null)
+            {
+                return NotFound(new { message = "Fila não encontrada." });
+            }
+
+            // Exclusão lógica: desativa a fila para novas senhas
+            fila.Ativa = false;
+
+            // Cancela em lote todos os atendimentos que ainda estavam aguardando nessa fila
+            var atendimentosAtivos = await _context.Atendimentos
+                .Where(a => a.FilaId == id && a.Status == "Aguardando")
+                .ToListAsync();
+
+            foreach (var atendimento in atendimentosAtivos)
+            {
+                atendimento.Status = "Cancelado";
+                atendimento.Posicao = 0;
+            }
+
+            await _context.SaveChangesAsync();
+
+            await _hubContext.Clients.All.SendAsync("FilaCriada"); 
+            await _hubContext.Clients.All.SendAsync("AtualizarFila", id);
+
+            return Ok(new { message = $"Fila '{fila.Nome}' e seus atendimentos ativos foram encerrados com sucesso." });
+        }
+
+        // Endpoint para o Cliente desistir/sair da fila
+        [HttpPost("sair")]
+        [Authorize]
+        public async Task<IActionResult> SairDaFila([FromBody] EntrarFilaDto request)
+        {
+            // Extract User ID from JWT Token
+            var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(usuarioIdClaim))
+            {
+                return Unauthorized(new { message = "Usuário não identificado." });
+            }
+            int usuarioId = int.Parse(usuarioIdClaim);
+
+            // Busca o atendimento ativo deste usuário nesta fila
+            var atendimentoUsuario = await _context.Atendimentos
+                .FirstOrDefaultAsync(a => a.FilaId == request.FilaId && a.UsuarioId == usuarioId && a.Status == "Aguardando");
+
+            if (atendimentoUsuario == null)
+            {
+                return NotFound(new { message = "Você não possui um ticket ativo aguardando nesta fila." });
+            }
+
+            int posicaoRemovida = atendimentoUsuario.Posicao;
+
+            // Altera o status para Cancelado
+            atendimentoUsuario.Status = "Cancelado";
+            atendimentoUsuario.Posicao = 0;
+
+            // Reordena e subtrai 1 da posição de todo mundo que estava atrás dele na fila
+            var pessoasAtras = await _context.Atendimentos
+                .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando" && a.Posicao > posicaoRemovida)
+                .ToListAsync();
+
+            foreach (var atendimento in pessoasAtras)
+            {
+                atendimento.Posicao -= 1;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Avisa via SignalR para o front recalcular as posições na tela em tempo real
+            await _hubContext.Clients.All.SendAsync("AtualizarFila", request.FilaId);
+
+            return Ok(new { message = "Você saiu da fila com sucesso." });
+        }
+
+        // Endpoint para listar todas as filas
         [HttpGet]
         public async Task<IActionResult> ListarFilas()
         {
@@ -161,7 +240,7 @@ namespace backend.Controllers
             return Ok(atendimentosAtivos);
         }
 
-        // [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         [HttpPost("chamar-proxima")]
         public async Task<IActionResult> ChamarProximaSenha([FromBody] ChamarSenhaDto request)
         {
@@ -298,7 +377,6 @@ namespace backend.Controllers
                 deveSairAgora
             });
         }
-
         private double ToRadians(double val)
         {
             return (Math.PI / 180) * val;
