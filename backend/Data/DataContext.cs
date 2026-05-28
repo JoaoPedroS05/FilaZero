@@ -8,8 +8,8 @@ namespace backend.Data
         public DataContext(DbContextOptions<DataContext> options) : base(options) { }
 
         public DbSet<Usuario> Usuarios { get; set; }
-
         public DbSet<Fila> Filas { get; set; }
+        public DbSet<Atendimento> Atendimentos { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
