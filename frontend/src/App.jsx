@@ -1,42 +1,69 @@
-import { useState } from 'react';
-import Login from './pages/Login';
-import Register from './pages/Registro';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import Login from './pages/Login.jsx';
+import Register from './pages/Registro.jsx';
+import FilaVirtual from './pages/FilaVirtual.jsx';
+import AdminDashboard from './pages/AdminDashboard.jsx';
+
+// Componente para proteger rotas (impede acesso se não houver token)
+const PrivateRoute = ({ children }) => {
+  const isAuthenticated = !!localStorage.getItem('token');
+  return isAuthenticated ? children : <Navigate to="/login" />;
+};
 
 export default function App() {
-  
-  const [telaAtual, setTelaAtual] = useState('registro');
-
   return (
-    <div className="relative">
-      {/* Renderização Condicional da Tela */}
-      {telaAtual === 'registro' ? <Register /> : <Login />}
+    <BrowserRouter>
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        
+        {/* Navbar de Navegação */}
+        <nav className="bg-white shadow-sm border-b border-slate-100 px-6 py-4 flex justify-between items-center">
+          <Link to="/filas" className="text-xl font-black text-blue-600 tracking-tight">
+            FilaZero
+          </Link>
+          <div className="flex gap-4 text-sm font-semibold">
+            <Link to="/login" className="text-slate-600 hover:text-blue-600 transition-colors">
+              Login
+            </Link>
+            <Link to="/registro" className="text-slate-600 hover:text-blue-600 transition-colors">
+              Cadastrar
+            </Link>
+            <Link to="/admin" className="text-purple-600 hover:text-purple-700 transition-colors">
+              Painel Admin
+            </Link>
+            <button 
+              onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+              className="text-red-500 hover:text-red-600 cursor-pointer bg-none border-none font-semibold"
+            >
+              Sair
+            </button>
+          </div>
+        </nav>
 
-      {/* Barra de alternância flutuante para testes */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md px-4 py-2.5 rounded-full shadow-lg border border-slate-200/50 flex items-center gap-3 z-50">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-          Ambiente de Testes:
-        </span>
-        <button
-          onClick={() => setTelaAtual('registro')}
-          className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-            telaAtual === 'registro'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Tela Registro
-        </button>
-        <button
-          onClick={() => setTelaAtual('login')}
-          className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-            telaAtual === 'login'
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          Tela Login
-        </button>
+        {/* Renderização das Rotas da Aplicação */}
+        <div className="flex-1">
+          <Routes>
+            {/* Rotas Públicas */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/registro" element={<Register />} />
+
+            {/* Rotas Protegidas por Token */}
+            <Route path="/filas" element={
+              <PrivateRoute>
+                <FilaVirtual />
+              </PrivateRoute>
+            } />
+            <Route path="/admin" element={
+              <PrivateRoute>
+                <AdminDashboard />
+              </PrivateRoute>
+            } />
+
+            {/* Redirecionamento Padrão */}
+            <Route path="*" element={<Navigate to="/filas" />} />
+          </Routes>
+        </div>
+
       </div>
-    </div>
+    </BrowserRouter>
   );
 }
