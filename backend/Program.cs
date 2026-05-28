@@ -1,5 +1,6 @@
 using System.Text;
 using backend.Data;
+using backend.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -25,6 +26,9 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
+// --- 2. REGISTRO DO SIGNALR ---
+builder.Services.AddSignalR();
 
 var chave = Encoding.ASCII.GetBytes(builder.Configuration["JwtSettings:Secret"]!);
 builder.Services.AddAuthentication(options =>
@@ -59,12 +63,15 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// --- 2. ATIVAÇÃO DO MIDDLEWARE DE CORS ---
+// --- 3. ATIVAÇÃO DO MIDDLEWARE DE CORS ---
 app.UseCors("FilaZeroPolicy");
 
 app.UseAuthentication(); 
 app.UseAuthorization();
 
 app.MapControllers();
+
+// --- 4. MAPEAMENTO DA ROTA DO HUB ---
+app.MapHub<FilaHub>("/hub/fila");
 
 app.Run();
