@@ -222,7 +222,7 @@ export default function FilaVirtual() {
                       <div className="text-right">
                         <p className="text-slate-400 text-xs">Tempo Estimado</p>
                         <p className={`font-bold ${ticket.status === 'Chamado' ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {ticket.status === 'Chamado' ? 'Imediato' : `~{ticket.fila.tempoEstimadoEsperaMinutos} min`}
+                          {ticket.status === 'Chamado' ? 'Imediato' : `~${ticket.fila.tempoEstimadoEsperaMinutos} min`}
                         </p>
                       </div>
                     </div>

@@ -10,6 +10,7 @@ namespace backend.Data
         public DbSet<Usuario> Usuarios { get; set; }
         public DbSet<Fila> Filas { get; set; }
         public DbSet<Atendimento> Atendimentos { get; set; }
+        public DbSet<Guiche> Guiches { get; set; }
         
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

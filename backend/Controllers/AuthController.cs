@@ -68,7 +68,7 @@ namespace backend.Controllers
 
             return Ok(new { 
                 token = token, 
-                usuario = new { usuario.Id, usuario.Nome, usuario.Email } 
+                usuario = new { usuario.Id, usuario.Nome, usuario.Email, usuario.Role } 
             });
         }
 
@@ -83,7 +83,8 @@ namespace backend.Controllers
                 {
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Name, usuario.Nome),
-                    new Claim(ClaimTypes.Email, usuario.Email)
+                    new Claim(ClaimTypes.Email, usuario.Email),
+                    new Claim(ClaimTypes.Role, usuario.Role)
                 }),
                 Expires = DateTime.UtcNow.AddMinutes(double.Parse(_configuration["JwtSettings:ExpiryInMinutes"]!)),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)

@@ -30,6 +30,11 @@ namespace backend.Models
         [Required]
         public string Status { get; set; } = "Aguardando"; 
 
+        public int? GuicheId { get; set; }
+
+        [ForeignKey("GuicheId")]
+        public Guiche? Guiche { get; set; }
+
         public DateTime DataHoraEntrada { get; set; } = DateTime.UtcNow;
         public DateTime? DataHoraAtendimento { get; set; }
     }

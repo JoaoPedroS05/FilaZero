@@ -12,12 +12,15 @@ namespace backend.Models
         public string Nome { get; set; } = string.Empty;
 
         [Required]
-        [EmailAddress]
-        [StringLength(150)]
+        [StringLength(100)]
         public string Email { get; set; } = string.Empty;
 
         [Required]
         public string SenhaHash { get; set; } = string.Empty;
+        
+        [Required]
+        [StringLength(20)]
+        public string Role { get; set; } = "Cliente";
 
         public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
     }

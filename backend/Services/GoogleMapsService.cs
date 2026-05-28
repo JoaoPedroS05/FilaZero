@@ -16,7 +16,7 @@ namespace backend.Services
         public async Task<(int? tempoMinutos, double? distanciaKm)> CalcularTempoEDistancia(double originLat, double originLng, double destLat, double destLng)
         {
             // Se você ainda não tiver a chave, o sistema não quebra e podemos simular ou usar o Haversine
-            if (string.IsNullOrEmpty(_apiKey) || _apiKey.StartsWith("SUA_CHAVE"))
+            if (string.IsNullOrEmpty(_apiKey) || _apiKey.StartsWith("AIzaSyBdJxJkF27X9lxXcI9ZXVrxQdWZnfAxpkk"))
             {
                 return (null, null); 
             }
