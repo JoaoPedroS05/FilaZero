@@ -144,6 +144,16 @@ export default function FilaVirtual() {
     }
   };
 
+  const desistirFila = async (filaId) => {
+    if (!window.confirm('Tem certeza que deseja sair desta fila de espera? Seu ticket será cancelado.')) return;
+    try {
+      await api.post('/fila/sair', { filaId });
+      carregarDados(); // Atualiza a tela para sumir o card
+    } catch (err) {
+      setError(err.response?.data?.message || 'Não foi possível sair da fila.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-4xl mx-auto space-y-8">
