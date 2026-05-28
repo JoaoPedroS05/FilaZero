@@ -117,5 +117,43 @@ namespace backend.Controllers
                 }
             });
         }
+    
+        [HttpGet("meus-atendimentos")]
+        [Authorize]
+        public async Task<IActionResult> ObterMeusAtendimentos()
+        {
+            // 1. Extrair o ID do Usuário do Token JWT
+            var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(usuarioIdClaim))
+            {
+                return Unauthorized(new { message = "Usuário não identificado no token." });
+            }
+            int usuarioId = int.Parse(usuarioIdClaim);
+
+            // 2. Buscar atendimentos ativos (Aguardando ou Chamado) trazendo os dados da Fila junto (Include)
+            var atendimentosAtivos = await _context.Atendimentos
+                .Include(a => a.Fila)
+                .Where(a => a.UsuarioId == usuarioId && (a.Status == "Aguardando" || a.Status == "Chamado"))
+                .OrderByDescending(a => a.DataHoraEntrada)
+                .Select(a => new
+                {
+                    a.Id,
+                    a.Senha,
+                    a.Posicao,
+                    a.Status,
+                    a.DataHoraEntrada,
+                    Fila = new
+                    {
+                        a.Fila!.Id,
+                        a.Fila.Nome,
+                        a.Fila.TipoServico,
+                        TempoEstimadoEsperaMinutos = a.Posicao * a.Fila.TempoMedioAtendimento
+                    }
+                })
+                .ToListAsync();
+
+            return Ok(atendimentosAtivos);
+        }
+    
     }
 }
