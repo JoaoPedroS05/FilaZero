@@ -23,8 +23,8 @@ namespace backend.Controllers
             _configuration = configuration;
         }
 
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterDto request)
+        [HttpPost("registro")]
+        public async Task<IActionResult> Registro([FromBody] RegistroDto request)
         {
             // 1. Validação de e-mail único
             var emailExiste = await _context.Usuarios.AnyAsync(u => u.Email == request.Email);

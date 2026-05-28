@@ -14,6 +14,18 @@ builder.Services.AddDbContext<DataContext>(options =>
     )
 );
 
+// --- 1. REGISTRO DO SERVIÇO DE CORS ---
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("FilaZeroPolicy", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 var chave = Encoding.ASCII.GetBytes(builder.Configuration["JwtSettings:Secret"]!);
 builder.Services.AddAuthentication(options =>
 {
@@ -46,6 +58,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// --- 2. ATIVAÇÃO DO MIDDLEWARE DE CORS ---
+app.UseCors("FilaZeroPolicy");
 
 app.UseAuthentication(); 
 app.UseAuthorization();
