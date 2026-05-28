@@ -63,42 +63,48 @@ export default function FilaVirtual() {
   };
 
   useEffect(() => {
-    carregarDados();
+  carregarDados();
 
-    const novaConexao = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5033/hub/fila', {
-        skipNegotiation: true,
-        transport: signalR.HttpTransportType.WebSockets
-      })
-      .withAutomaticReconnect()
-      .build();
+  const novaConexao = new signalR.HubConnectionBuilder()
+    .withUrl('http://localhost:5033/hub/fila', {
+      skipNegotiation: true,
+      transport: signalR.HttpTransportType.WebSockets
+    })
+    .withAutomaticReconnect()
+    .build();
 
-    novaConexao.start()
-      .then(() => {
-        novaConexao.on('AtualizarFila', () => {
-          carregarDados();
-        });
+  // Função interna para gerenciar o início seguro
+  const iniciarConexao = async () => {
+    try {
+      if (novaConexao.state === signalR.HubConnectionState.Disconnected) {
+        await novaConexao.start();
+        console.log('Conectado ao SignalR com sucesso!');
 
-        novaConexao.on('FilaCriada', () => {
-          carregarDados();
-        });
-
+        novaConexao.on('AtualizarFila', () => carregarDados());
+        novaConexao.on('FilaCriada', () => carregarDados());
         novaConexao.on('SenhaChamada', (dados) => {
           setAlertaChamada(dados.senha);
           setTimeout(() => setAlertaChamada(null), 7000);
         });
-      })
-      .catch(err => console.error('Erro no SignalR: ', err));
-
-    return () => {
-      if (novaConexao) {
-        novaConexao.off('AtualizarFila');
-        novaConexao.off('FilaCriada');
-        novaConexao.off('SenhaChamada');
-        novaConexao.stop();
       }
-    };
-  }, []);
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        Console.error('Erro no SignalR: ', err);
+      }
+    }
+  };
+
+  iniciarConexao();
+
+  return () => {
+    if (novaConexao) {
+      novaConexao.off('AtualizarFila');
+      novaConexao.off('FilaCriada');
+      novaConexao.off('SenhaChamada');
+      novaConexao.stop();
+    }
+  };
+}, []);
 
   const entrarFila = async (filaId) => {
     setLoading(true);
