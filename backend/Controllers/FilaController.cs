@@ -303,5 +303,12 @@ namespace backend.Controllers
         {
             return (Math.PI / 180) * val;
         }
+
+        [HttpGet("guiches")]
+        public async Task<IActionResult> ListarGuiches()
+        {
+            var guiches = await _context.Guiches.Where(g => g.Ativo).ToListAsync();
+            return Ok(guiches);
+        }
     }
 }
