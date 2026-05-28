@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as signalR from '@microsoft/signalr';
 import api from '../services/api';
 
 export default function FilaVirtual() {
@@ -7,7 +8,7 @@ export default function FilaVirtual() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Carrega as filas disponíveis e os atendimentos atuais do usuário
+  // Função centralizada para carregar dados HTTP da API
   const carregarDados = async () => {
     try {
       const [resFilas, resMeusAtendimentos] = await Promise.all([
@@ -21,8 +22,45 @@ export default function FilaVirtual() {
     }
   };
 
+  // 2. useEffect dedicado para gerenciar a conexão em tempo real via WebSocket
   useEffect(() => {
     carregarDados();
+
+    // Configura a conexão com o Hub do backend
+    const novaConexao = new signalR.HubConnectionBuilder()
+      .withUrl('http://localhost:5033/hub/fila', {
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets
+      })
+      .withAutomaticReconnect()
+      .build();
+
+    // Inicia a conexão
+    novaConexao.start()
+      .then(() => {
+        console.log('Conectado ao SignalR com sucesso!');
+
+        // Escuta o evento enviado pelo FilaController do .NET
+        novaConexao.on('AtualizarFila', (filaId) => {
+          console.log(`A fila ${filaId} sofreu atualizações. Atualizando dados locais...`);
+          carregarDados(); // Atualiza a tela sem dar F5
+        });
+
+        // Escuta se uma nova fila foi adicionada pelo admin
+        novaConexao.on('FilaCriada', () => {
+          carregarDados();
+        });
+      })
+      .catch(err => console.error('Erro ao conectar ao Hub do SignalR: ', err));
+
+    // Cleanup: Fecha a conexão WebSocket quando o usuário sai da página
+    return () => {
+      if (novaConexao) {
+        novaConexao.off('AtualizarFila');
+        novaConexao.off('FilaCriada');
+        novaConexao.stop();
+      }
+    };
   }, []);
 
   // Função para entrar em uma fila específica
@@ -31,7 +69,6 @@ export default function FilaVirtual() {
     setError('');
     try {
       await api.post('/fila/entrar', { filaId });
-      await carregarDados();
     } catch (err) {
       setError(err.response?.data?.message || 'Não foi possível entrar na fila.');
     } finally {
