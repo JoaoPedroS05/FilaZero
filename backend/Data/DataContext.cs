@@ -24,14 +24,14 @@ namespace backend.Data
                 new Guiche { Id = 4, NumeroOuNome = "Mesa de Atendimento A", Ativo = true }
             );
 
-            // 2. Carga Inicial de um Usuário Administrador de Testes
+           // 2. Carga Inicial de um Usuário Administrador de Testes
             modelBuilder.Entity<Usuario>().HasData(
                 new Usuario
                 {
                     Id = 999,
                     Nome = "Administrador Sistema",
                     Email = "admin@filazero.com",
-                    SenhaHash = "$2a$11$M2XvH17UoJv6N5PkhZEn/.F1A8h9r8Ebe4m8IlyXvA5D3Z7gq7KFe",
+                    SenhaHash = BCrypt.Net.BCrypt.HashPassword("admin123"), 
                     Role = "Admin",
                     DataCriacao = new DateTime(2026, 5, 28, 0, 0, 0, DateTimeKind.Utc)
                 }
