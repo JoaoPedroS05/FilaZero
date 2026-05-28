@@ -1,6 +1,7 @@
 using System.Text;
 using backend.Data;
 using backend.Hubs;
+using backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -52,6 +53,8 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient<GoogleMapsService>();
+builder.Services.AddScoped<GoogleMapsService>();
 
 var app = builder.Build();
 

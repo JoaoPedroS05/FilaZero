@@ -15,5 +15,8 @@ namespace backend.DTOs
         [Required(ErrorMessage = "O tempo médio de atendimento é obrigatório.")]
         [Range(1, 1440, ErrorMessage = "O tempo médio deve ser de pelo menos 1 minuto.")]
         public int TempoMedioAtendimento { get; set; }
+
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
     }
 }
