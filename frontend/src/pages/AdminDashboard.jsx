@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 export default function AdminDashboard() {
+
+  const navigate = useNavigate();
+
   const [filas, setFilas] = useState([]);
   const [guiches, setGuiches] = useState([]);
   const [guicheSelecionado, setGuicheSelecionado] = useState(''); 
@@ -36,6 +40,15 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+
+  const usuarioLogado = JSON.parse(localStorage.getItem('usuario')); 
+    
+    if (!usuarioLogado || usuarioLogado.role !== 'Admin') {
+      alert('Acesso negado! Esta área é exclusiva para administradores.');
+      navigate('/filas'); 
+      return;
+    }
+    
     inicializarPainel();
   }, []);
 
@@ -83,7 +96,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // 🔥 NOVA FUNÇÃO: Remove (desativa) a fila logicamente do sistema
+  // Remove (desativa) a fila logicamente do sistema
   const handleRemoverFila = async (filaId, nomeFila) => {
     if (!window.confirm(`AVISO: Deseja mesmo remover a fila "${nomeFila}"? Isso cancelará todos os atendimentos ativos dela.`)) return;
     

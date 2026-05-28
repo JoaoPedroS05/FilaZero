@@ -28,6 +28,7 @@ namespace backend.Controllers
 
         // Endpoint para criar uma nova fila
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CriarFila([FromBody] CriarFilaDto request)
         {
             var novaFila = new Fila
@@ -125,12 +126,12 @@ namespace backend.Controllers
 
             return Ok(new { message = "Você saiu da fila com sucesso." });
         }
-
-        // Endpoint para listar todas as filas
+       
+        // Endpoint para listar todas as filas ativas
         [HttpGet]
         public async Task<IActionResult> ListarFilas()
         {
-            var filas = await _context.Filas.ToListAsync();
+            var filas = await _context.Filas.Where(f => f.Ativa).ToListAsync();
             return Ok(filas);
         }
 
