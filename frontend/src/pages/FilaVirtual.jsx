@@ -19,10 +19,16 @@ export default function FilaVirtual() {
       setFilas(resFilas.data);
       setMeusAtendimentos(resMeusAtendimentos.data);
 
-      // Dispara o cálculo de deslocamento para cada ticket ativo que esteja "Aguardando"
+      // Só calcula deslocamento se a fila vinculada possuir coordenadas no banco
       resMeusAtendimentos.data.forEach(ticket => {
-        if (ticket.status === 'Aguardando') {
-          obterAnaliseDeslocamento(ticket.id);
+        if (ticket.status === 'Aguardando' && ticket.fila?.id) {
+          // Busca os dados completos da fila correspondente na lista de filas carregadas
+          const dadosFilaCompleta = resFilas.data.find(f => f.id === ticket.fila.id);
+          
+          // Se a fila tiver latitude e longitude configuradas, faz o cálculo preditivo
+          if (dadosFilaCompleta?.latitude && dadosFilaCompleta?.longitude) {
+            obterAnaliseDeslocamento(ticket.id);
+          }
         }
       });
     } catch (err) {
@@ -65,6 +71,9 @@ export default function FilaVirtual() {
   useEffect(() => {
   carregarDados();
 
+  // Flag para rastrear se o componente ainda está ativo na tela
+  let componenteAtivo = true;
+
   const novaConexao = new signalR.HubConnectionBuilder()
     .withUrl('http://localhost:5033/hub/fila', {
       skipNegotiation: true,
@@ -73,11 +82,18 @@ export default function FilaVirtual() {
     .withAutomaticReconnect()
     .build();
 
-  // Função interna para gerenciar o início seguro
   const iniciarConexao = async () => {
     try {
-      if (novaConexao.state === signalR.HubConnectionState.Disconnected) {
+      // Só inicia se o componente não tiver sido desmontado pelo Strict Mode
+      if (componenteAtivo && novaConexao.state === signalR.HubConnectionState.Disconnected) {
         await novaConexao.start();
+        
+        // Se após conectar, o Strict Mode já tiver matado o componente, aborta as escutas
+        if (!componenteAtivo) {
+          await novaConexao.stop();
+          return;
+        }
+
         console.log('Conectado ao SignalR com sucesso!');
 
         novaConexao.on('AtualizarFila', () => carregarDados());
@@ -89,7 +105,7 @@ export default function FilaVirtual() {
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
-        Console.error('Erro no SignalR: ', err);
+        console.error('Erro no SignalR: ', err);
       }
     }
   };
@@ -97,11 +113,17 @@ export default function FilaVirtual() {
   iniciarConexao();
 
   return () => {
+    // Sinaliza que este ciclo específico foi encerrado
+    componenteAtivo = false;
+    
     if (novaConexao) {
       novaConexao.off('AtualizarFila');
       novaConexao.off('FilaCriada');
       novaConexao.off('SenhaChamada');
-      novaConexao.stop();
+      // Só para se estiver de fato ativo
+      if (novaConexao.state === signalR.HubConnectionState.Connected) {
+        novaConexao.stop();
+      }
     }
   };
 }, []);
