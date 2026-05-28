@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 export default function Login() {
@@ -6,6 +7,8 @@ export default function Login() {
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,10 +18,16 @@ export default function Login() {
     try {
       const response = await api.post('/auth/login', { email, senha });
       
-      // Armazena o Token JWT no localStorage para persistência de sessão (Critério História 2)
+      // 1. Armazena o Token JWT no localStorage para persistência de sessão (Critério História 2)
       localStorage.setItem('token', response.data.token);
       
       setSuccess(`Bem-vindo de volta, ${response.data.usuario.nome}!`);
+
+      // 2. Aguarda 1.5 segundos para o usuário ler o feedback e muda para a tela de filas
+      setTimeout(() => {
+        navigate('/filas');
+      }, 1500);
+
     } catch (err) {
       setError(err.response?.data?.message || 'E-mail ou senha inválidos.');
     }
