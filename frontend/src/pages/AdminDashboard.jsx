@@ -41,31 +41,38 @@ export default function AdminDashboard() {
   }, []);
 
   const handleCriarFila = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  e.preventDefault();
+  setError('');
+  setSuccess('');
 
-    try {
-      // Envia o novo campo 'ehPublica' junto ao payload da API
-      await api.post('/fila', {
-        nome,
-        tipoServico,
-        tempoMedioAtendimento: parseInt(tempoMedio),
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        ehPublica 
-      });
+  try {
+    // 1. Envia para a API
+    await api.post('/fila', {
+      nome,
+      tipoServico,
+      tempoMedioAtendimento: parseInt(tempoMedio),
+      latitude: latitude ? parseFloat(latitude) : null,
+      longitude: longitude ? parseFloat(longitude) : null,
+      ehPublica 
+    });
 
-      setSuccess('Nova fila configurada com sucesso!');
-      setNome(''); setTipoServico(''); setTempoMedio(''); setLatitude(''); setLongitude('');
-      setEhPublica(true);
-      
-      const res = await api.get('/fila');
-      setFilas(res.data);
-    } catch (err) {
-      setError('Erro ao criar a fila. Verifique os dados.');
-    }
-  };
+    setSuccess('Nova fila configurada com sucesso!');
+    
+    // 2. Reseta os campos APENAS após o sucesso do POST
+    setNome(''); 
+    setTipoServico(''); 
+    setTempoMedio(''); 
+    setLatitude(''); 
+    setLongitude('');
+    setEhPublica(true);
+    
+    // 3. Atualiza a lista
+    const res = await api.get('/fila');
+    setFilas(res.data);
+  } catch (err) {
+    setError('Erro ao criar a fila. Verifique os dados.');
+  }
+};
 
   const chamarProxima = async (filaId) => {
     setError('');
@@ -127,7 +134,7 @@ export default function AdminDashboard() {
           <div>
             <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Privacidade de Acesso</label>
             <select 
-              value={ehPublica} 
+              value={ehPublica.toString()} 
               onChange={(e) => setEhPublica(e.target.value === 'true')}
               className="w-full px-3 py-2 border rounded-xl text-sm bg-slate-50 focus:outline-blue-500 font-medium text-slate-700"
             >

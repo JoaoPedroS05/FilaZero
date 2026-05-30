@@ -38,7 +38,11 @@ namespace backend.Controllers
                 TempoMedioAtendimento = request.TempoMedioAtendimento,
                 Latitude = request.Latitude,   
                 Longitude = request.Longitude, 
-                Ativa = true 
+                Ativa = true,
+                
+                EhPublica = request.EhPublica, 
+                // Se for privada, gera um código aleatório de 8 caracteres para o QR Code, se for pública fica vazio
+                CodigoAcesso = !request.EhPublica ? Guid.NewGuid().ToString().Substring(0, 8) : string.Empty
             };
 
             _context.Filas.Add(novaFila);
