@@ -13,7 +13,7 @@ export default function FilaVirtual() {
   const carregarDados = async () => {
     try {
       const [resFilas, resMeusAtendimentos] = await Promise.all([
-        api.get('/fila'),
+        api.get('/fila/publicas'),
         api.get('/fila/meus-atendimentos')
       ]);
       setFilas(resFilas.data);

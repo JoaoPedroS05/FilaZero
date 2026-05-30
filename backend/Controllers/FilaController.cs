@@ -136,9 +136,18 @@ namespace backend.Controllers
         public async Task<IActionResult> ListarFilas()
         {
             var filas = await _context.Filas
+            .Where(f => f.Ativa)
+            .ToListAsync();
+            return Ok(filas);
+        }
+
+        [HttpGet("publicas")]
+        public async Task<IActionResult> ListarFilasPublicas()
+        {
+            var filasPublicas = await _context.Filas
                 .Where(f => f.Ativa && f.EhPublica)
                 .ToListAsync();
-            return Ok(filas);
+            return Ok(filasPublicas);
         }
 
         [HttpPost("entrar")]

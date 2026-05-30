@@ -199,24 +199,27 @@ export default function AdminDashboard() {
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-100">
           <h2 className="text-xl font-black text-slate-900 mb-4">Painel de Chamadas</h2>
           <div className="divide-y divide-slate-100">
-            {filas.filter(fila => fila.ativa).map((fila) => (
+            {/* Filtra APENAS por filas ativas */}
+            {filas && filas.filter(fila => fila.ativa).map((fila) => (
               <div key={fila.id} className="py-5 flex flex-col gap-4 first:pt-0 last:pb-0">
+                
                 <div className="flex justify-between items-center">
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="font-bold text-slate-800">{fila.nome}</h3>
-                      {/* Badge dinâmico de privacidade */}
+                      {/* Badge dinâmico para o Admin saber qual é qual */}
                       {fila.ehPublica ? (
-                        <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-semibold">Pública</span>
+                        <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full font-semibold">🌐 Pública</span>
                       ) : (
-                        <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-semibold">Privada</span>
+                        <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-semibold">🔒 Privada</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-slate-400 text-xs">{fila.tipoServico}</p>
-                      {fila.latitude && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-mono">📍 Localizado</span>}
                     </div>
                   </div>
+                  
+                  {/* Botões de Ação */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => chamarProxima(fila.id)}
@@ -227,35 +230,33 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => handleRemoverFila(fila.id, fila.nome)}
                       className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-2.5 rounded-xl text-xs cursor-pointer border border-red-200 transition-colors flex items-center justify-center"
-                      title="Remover Fila"
                     >
                       🗑️
                     </button>
                   </div>
                 </div>
 
-                {/* SEÇÃO DO QR CODE: Renderizada em tempo real para impressão local caso a fila seja privada */}
+                {/* Bloco do QR Code para filas privadas */}
                 {!fila.ehPublica && (
                   <div className="p-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 flex flex-col sm:flex-row items-center gap-4 justify-between">
                     <div className="text-center sm:text-left space-y-1">
-                      <p className="text-xs font-black text-slate-700 uppercase tracking-wide">Totem de Autoatendimento</p>
-                      <p className="text-xs text-slate-400 max-w-xs">Exiba ou imprima este código na recepção. O cliente entrará direto nesta fila ao escanear.</p>
+                      <p className="text-xs font-black text-slate-700 uppercase tracking-wide">📦 Totem de Autoatendimento</p>
+                      <p className="text-xs text-slate-400 max-w-xs">Exiba ou imprima este código na recepção.</p>
                       <span className="inline-block font-mono text-[11px] bg-white border px-2 py-0.5 rounded text-slate-500 mt-1">
-                        Token: {fila.codigoAcesso || `ID-${fila.id}`}
+                        Token: {fila.codigoAcesso}
                       </span>
                     </div>
                     <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-100">
-                      {/* O QR Code gera a URL que direciona o celular do usuário direto para a ação do token */}
-                      <QRCodeSVG value={`http://localhost:5173/entrar-fila/${fila.codigoAcesso || fila.id}`} size={90} />
+                      <QRCodeSVG value={`http://localhost:5173/entrar-fila/${fila.codigoAcesso}`} size={90} />
                     </div>
                   </div>
                 )}
+
               </div>
             ))}
           </div>
         </div>
       </div>
-
     </div>
   );
 }
