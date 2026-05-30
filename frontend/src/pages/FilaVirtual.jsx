@@ -19,15 +19,17 @@ export default function FilaVirtual() {
       setFilas(resFilas.data);
       setMeusAtendimentos(resMeusAtendimentos.data);
 
-      // Só calcula deslocamento se a fila vinculada possuir coordenadas no banco
+      // Dispara a análise olhando diretamente as coordenadas que vêm no próprio ticket
       resMeusAtendimentos.data.forEach(ticket => {
-        if (ticket.status === 'Aguardando' && ticket.fila?.id) {
-          // Busca os dados completos da fila correspondente na lista de filas carregadas
-          const dadosFilaCompleta = resFilas.data.find(f => f.id === ticket.fila.id);
+        if (ticket.status === 'Aguardando' && ticket.fila) {
+          // Pega a latitude e longitude direto do objeto associado ao atendimento
+          const lat = ticket.fila.latitude;
+          const lng = ticket.fila.longitude;
           
-          // Se a fila tiver latitude e longitude configuradas, faz o cálculo preditivo
-          if (dadosFilaCompleta?.latitude && dadosFilaCompleta?.longitude) {
+          if (lat && lng) {
             obterAnaliseDeslocamento(ticket.id);
+          } else {
+            console.warn(`O ticket ${ticket.senha} da fila ${ticket.fila.nome} não possui coordenadas cadastradas no banco.`);
           }
         }
       });
@@ -36,7 +38,6 @@ export default function FilaVirtual() {
     }
   };
 
-  // Função para capturar a localização atual do navegador e consultar a API .NET
   const obterAnaliseDeslocamento = (atendimentoId) => {
     if (!navigator.geolocation) {
       console.log('Geolocalização não suportada pelo seu navegador.');
@@ -53,7 +54,6 @@ export default function FilaVirtual() {
             longitudeCliente: longitude
           });
 
-          // Armazena o resultado atrelando ao ID do atendimento correspondente
           setDadosDeslocamento(prev => ({
             ...prev,
             [atendimentoId]: response.data
@@ -63,80 +63,74 @@ export default function FilaVirtual() {
         }
       },
       (error) => {
-        console.warn('Permissão de localização negada pelo usuário.');
+        console.warn('Permissão de localização negada pelo usuário ou indisponível.');
       }
     );
   };
 
   useEffect(() => {
-  carregarDados();
+    carregarDados();
 
-  // Flag para rastrear se o componente ainda está ativo na tela
-  let componenteAtivo = true;
+    let componenteAtivo = true;
 
-  const novaConexao = new signalR.HubConnectionBuilder()
-    .withUrl('http://localhost:5033/hub/fila', {
-      skipNegotiation: true,
-      transport: signalR.HttpTransportType.WebSockets
-    })
-    .withAutomaticReconnect()
-    .build();
+    const novaConexao = new signalR.HubConnectionBuilder()
+      .withUrl('http://localhost:5033/hub/fila', {
+        skipNegotiation: true,
+        transport: signalR.HttpTransportType.WebSockets
+      })
+      .withAutomaticReconnect()
+      .build();
 
-  const iniciarConexao = async () => {
-    try {
-      // Só inicia se o componente não tiver sido desmontado pelo Strict Mode
-      if (componenteAtivo && novaConexao.state === signalR.HubConnectionState.Disconnected) {
-        await novaConexao.start();
-        
-        // Se após conectar, o Strict Mode já tiver matado o componente, aborta as escutas
-        if (!componenteAtivo) {
-          await novaConexao.stop();
-          return;
+    const iniciarConexao = async () => {
+      try {
+        if (componenteAtivo && novaConexao.state === signalR.HubConnectionState.Disconnected) {
+          await novaConexao.start();
+          
+          if (!componenteAtivo) {
+            await novaConexao.stop();
+            return;
+          }
+
+          console.log('Conectado ao SignalR com sucesso!');
+
+          novaConexao.on('AtualizarFila', () => carregarDados());
+          novaConexao.on('FilaCriada', () => carregarDados());
+          novaConexao.on('SenhaChamada', (dados) => {
+            setAlertaChamada({
+              senha: dados.senha,
+              guicheNome: dados.guicheNome || 'Guichê Padrão'
+            });    
+            setTimeout(() => setAlertaChamada(null), 7000);
+          });
         }
-
-        console.log('Conectado ao SignalR com sucesso!');
-
-        novaConexao.on('AtualizarFila', () => carregarDados());
-        novaConexao.on('FilaCriada', () => carregarDados());
-        novaConexao.on('SenhaChamada', (dados) => {
-          setAlertaChamada({
-            senha: dados.senha,
-            guicheNome: dados.guicheNome || 'Guichê Padrão'
-          });    
-          // Limpa o banner após 7 segundos
-          setTimeout(() => setAlertaChamada(null), 7000);
-        });
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Erro no SignalR: ', err);
+        }
       }
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        console.error('Erro no SignalR: ', err);
-      }
-    }
-  };
+    };
 
-  iniciarConexao();
+    iniciarConexao();
 
-  return () => {
-    // Sinaliza que este ciclo específico foi encerrado
-    componenteAtivo = false;
-    
-    if (novaConexao) {
-      novaConexao.off('AtualizarFila');
-      novaConexao.off('FilaCriada');
-      novaConexao.off('SenhaChamada');
-      // Só para se estiver de fato ativo
-      if (novaConexao.state === signalR.HubConnectionState.Connected) {
-        novaConexao.stop();
+    return () => {
+      componenteAtivo = false;
+      if (novaConexao) {
+        novaConexao.off('AtualizarFila');
+        novaConexao.off('FilaCriada');
+        novaConexao.off('SenhaChamada');
+        if (novaConexao.state === signalR.HubConnectionState.Connected) {
+          novaConexao.stop();
+        }
       }
-    }
-  };
-}, []);
+    };
+  }, []);
 
   const entrarFila = async (filaId) => {
     setLoading(true);
     setError('');
     try {
       await api.post('/fila/entrar', { filaId });
+      carregarDados();
     } catch (err) {
       setError(err.response?.data?.message || 'Não foi possível entrar na fila.');
     } finally {
@@ -148,7 +142,7 @@ export default function FilaVirtual() {
     if (!window.confirm('Tem certeza que deseja sair desta fila de espera? Seu ticket será cancelado.')) return;
     try {
       await api.post('/fila/sair', { filaId });
-      carregarDados(); // Atualiza a tela para sumir o card
+      carregarDados();
     } catch (err) {
       setError(err.response?.data?.message || 'Não foi possível sair da fila.');
     }
@@ -161,10 +155,10 @@ export default function FilaVirtual() {
         {/* Cabeçalho */}
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">FilaZero</h1>
-          <p className="text-slate-500">Pegue sua senha remota e evite aglomerações</p>
+          <p className="text-slate-500 text-sm">Acompanhe seus agendamentos ou consulte o tempo de locomoção local</p>
         </div>
 
-        {/* ANIMAÇÃO DE SENHA CHAMADA */}
+        {/* Alerta de Chamada Recorrente do SignalR */}
         {alertaChamada && (
           <div className="bg-amber-500 text-white p-8 rounded-3xl shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse border-4 border-amber-400">
             <div className="text-center md:text-left">
@@ -179,13 +173,15 @@ export default function FilaVirtual() {
 
         {error && <div className="p-4 bg-red-50 text-red-700 rounded-xl font-medium border border-red-100 text-sm">{error}</div>}
 
-        {/* Painel de Senhas Ativas do Usuário */}
+        {/* 1. SEÇÃO DE TICKETS ATIVOS DO CLIENTE */}
         {meusAtendimentos.length > 0 && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold text-slate-800">Seus Tickets Ativos</h2>
             <div className="grid md:grid-cols-2 gap-4">
               {meusAtendimentos.map((ticket) => {
                 const analise = dadosDeslocamento[ticket.id];
+                // Pega o tempo estimado correto que vem do objeto
+                const tempoEspera = ticket.tempoEstimadoEsperaMinutos ?? ticket.fila?.tempoEstimadoEsperaMinutos ?? 0;
 
                 return (
                   <div 
@@ -194,20 +190,21 @@ export default function FilaVirtual() {
                       ticket.status === 'Chamado' ? 'border-amber-400 ring-4 ring-amber-500/10 bg-amber-50/10' : 'border-blue-100'
                     }`}
                   >
-                    {/* Badge de Status */}
                     <div className={`absolute top-0 right-0 text-white text-xs px-3 py-1 rounded-bl-xl font-bold uppercase tracking-wider ${
                       ticket.status === 'Chamado' ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'
                     }`}>
                       {ticket.status}
                     </div>
 
-                    {/* Informações do Cabeçalho do Card */}
                     <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{ticket.fila.nome}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{ticket.fila?.nome}</p>
+                        {ticket.fila?.ehPublica === false}
+                      </div>
                       <h3 className={`text-4xl font-black my-2 ${ticket.status === 'Chamado' ? 'text-amber-500' : 'text-blue-600'}`}>{ticket.senha}</h3>
                     </div>
 
-                    {/* --- PAINEL DE GEOLOCALIZAÇÃO PREDITIVA --- */}
+                    {/* BLOCO DE GEOLOCALIZAÇÃO CONDICIONAL */}
                     {ticket.status === 'Aguardando' && analise && (
                       <div className={`mt-3 p-3.5 rounded-xl border text-xs font-medium space-y-1 ${
                         analise.deveSairAgora 
@@ -222,33 +219,27 @@ export default function FilaVirtual() {
                           <span>⏱️ Tempo de Viagem:</span>
                           <span>~{analise.tempoDeslocamentoMinutos} min</span>
                         </div>
-                        <p className="pt-2 border-t border-dashed current-border font-semibold opacity-90">
+                        <p className="pt-2 border-t border-dashed border-slate-200 font-semibold opacity-90">
                           💡 {analise.recomendacao}
                         </p>
                       </div>
                     )}
 
-                    {/* --- ÁREA DE AÇÕES DINÂMICAS DO TICKET --- */}
                     <div className="mt-4">
                       {ticket.status === 'Aguardando' ? (
-                        /* Cliente quer sair da fila por erro ou desistência */
                         <button
-                          onClick={() => desistirFila(ticket.fila.id)}
+                          onClick={() => desistirFila(ticket.fila?.id)}
                           className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer uppercase tracking-wider"
                         >
                           Sair da Fila de Espera
                         </button>
                       ) : (
-                        /* Ticket já foi recebido/chamado, cliente limpa ele da tela */
                         <button
                           onClick={async () => {
                             try {
-                              // Chamamos um endpoint para mudar o status para "Finalizado"
-                              // Se você não tiver o endpoint estrito, simulamos mudando o status localmente ou batendo na API
                               await api.post(`/fila/finalizar-ticket`, { atendimentoId: ticket.id });
-                              carregarDados(); // Recarrega para sumir da tela
+                              carregarDados();
                             } catch (err) {
-                              // Fallback temporário caso queira testar antes de mexer no controller:
                               carregarDados();
                             }
                           }}
@@ -259,7 +250,6 @@ export default function FilaVirtual() {
                       )}
                     </div>
 
-                    {/* Rodapé Informativo */}
                     <div className="border-t border-slate-100 pt-4 mt-4 flex justify-between text-sm">
                       <div>
                         <p className="text-slate-400 text-xs">Sua Posição</p>
@@ -269,8 +259,9 @@ export default function FilaVirtual() {
                       </div>
                       <div className="text-right">
                         <p className="text-slate-400 text-xs">Tempo Estimado</p>
+                        {/* 🔥 CORREÇÃO DA SINTAXE: Renderiza o valor injetado diretamente em JavaScript */}
                         <p className={`font-bold ${ticket.status === 'Chamado' ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {ticket.status === 'Chamado' ? 'Imediato' : `~${ticket.fila.tempoEstimadoEsperaMinutos} min`}
+                          {ticket.status === 'Chamado' ? 'Imediato' : `~${tempoEspera} min`}
                         </p>
                       </div>
                     </div>
@@ -282,26 +273,40 @@ export default function FilaVirtual() {
           </div>
         )}
 
-        {/* Listagem de Filas */}
+        {/* 2. SEÇÃO DE FILAS DISPONÍVEIS NA REGIÃO */}
         <div className="space-y-4">
           <h2 className="text-xl font-bold text-slate-800">Filas de Atendimento Disponíveis</h2>
           <div className="grid md:grid-cols-3 gap-4">
             {filas.map((fila) => (
               <div key={fila.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col justify-between">
                 <div>
-                  <h3 className="font-bold text-slate-800 text-lg">{fila.nome}</h3>
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-bold text-slate-800 text-lg leading-tight">{fila.nome}</h3>
+                    {fila.ehPublica === false}
+                  </div>
                   <p className="text-slate-500 text-sm mt-1">{fila.tipoServico}</p>
                   <span className="inline-block mt-3 bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-md">
                     Média: {fila.tempoMedioAtendimento} min / pessoa
                   </span>
                 </div>
-                <button
-                  disabled={loading || !fila.ativa}
-                  onClick={() => entrarFila(fila.id)}
-                  className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50"
-                >
-                  Entrar na Fila
-                </button>
+
+                {fila.ehPublica !== false ? (
+                  <button
+                    disabled={loading || !fila.ativa}
+                    onClick={() => entrarFila(fila.id)}
+                    className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50 uppercase tracking-wider font-bold"
+                  >
+                    Entrar na Fila
+                  </button>
+                ) : (
+                  <button
+                    disabled
+                    className="w-full mt-6 bg-slate-100 text-slate-400 border border-slate-200 font-medium py-2.5 rounded-xl text-sm cursor-not-allowed uppercase tracking-wider font-bold"
+                    title="Acesse este serviço escaneando o QR Code físico no totem local."
+                  >
+                    🔒 Requer QR Code
+                  </button>
+                )}
               </div>
             ))}
           </div>

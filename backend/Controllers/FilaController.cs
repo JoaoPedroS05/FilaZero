@@ -248,6 +248,9 @@ namespace backend.Controllers
                         a.Fila!.Id,
                         a.Fila.Nome,
                         a.Fila.TipoServico,
+                        a.Fila.EhPublica,
+                        a.Fila.Latitude,
+                        a.Fila.Longitude,
                         TempoEstimadoEsperaMinutos = a.Posicao * a.Fila.TempoMedioAtendimento
                     }
                 })
