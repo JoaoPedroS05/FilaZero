@@ -4,6 +4,7 @@ import Register from './pages/Registro.jsx';
 import FilaVirtual from './pages/FilaVirtual.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import Navbar from './components/Navbar.jsx';
+import FilaPrivada from './pages/FilaPrivada.jsx';
 
 // Protetor Geral de Autenticação (Exige apenas Token)
 const PrivateRoute = ({ children }) => {
@@ -30,11 +31,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        
-        {/* Chamada da Navbar Isolada e Reativa */}
         <Navbar />
 
-        {/* Renderização das Rotas da Aplicação */}
         <div className="flex-1">
           <Routes>
             {/* Rotas Públicas */}
@@ -48,6 +46,13 @@ export default function App() {
               </PrivateRoute>
             } />
 
+            {/* ROTA DO QR CODE: */}
+            <Route path="/entrar-fila/:codigoAcesso" element={
+              <PrivateRoute>
+                <FilaPrivada />
+              </PrivateRoute>
+            } />
+
             {/* Rota Administrativa Blindada */}
             <Route path="/admin" element={
               <AdminRoute>
@@ -55,11 +60,9 @@ export default function App() {
               </AdminRoute>
             } />
 
-            {/* Redirecionamento Padrão */}
             <Route path="*" element={<Navigate to="/filas" />} />
           </Routes>
         </div>
-
       </div>
     </BrowserRouter>
   );
