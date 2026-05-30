@@ -24,6 +24,12 @@ namespace backend.Models
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
 
+        [Required]
+        public bool EhPublica { get; set; } = true;
+
+        [StringLength(50)]
+        public string CodigoAcesso { get; set; } = string.Empty;
+
         public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
     }
 }

@@ -86,7 +86,7 @@ namespace backend.Controllers
         [Authorize]
         public async Task<IActionResult> SairDaFila([FromBody] EntrarFilaDto request)
         {
-            // Extract User ID from JWT Token
+            // Extrai id do usuário do token JWT autenticado
             var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(usuarioIdClaim))
             {
@@ -127,11 +127,13 @@ namespace backend.Controllers
             return Ok(new { message = "Você saiu da fila com sucesso." });
         }
        
-        // Endpoint para listar todas as filas ativas
+        // Endpoint para listar apenas as filas ativas que são públicas
         [HttpGet]
         public async Task<IActionResult> ListarFilas()
         {
-            var filas = await _context.Filas.Where(f => f.Ativa).ToListAsync();
+            var filas = await _context.Filas
+                .Where(f => f.Ativa && f.EhPublica)
+                .ToListAsync();
             return Ok(filas);
         }
 
@@ -319,7 +321,6 @@ namespace backend.Controllers
             int tempoDeslocamentoMinutos;
             double distanciaKm;
 
-            // Tentativa de obter rota exata e trânsito real do Google Maps
             var dadosGoogle = await _googleMapsService.CalcularTempoEDistancia(
                 request.LatitudeCliente, request.LongitudeCliente, 
                 fila.Latitude.Value, fila.Longitude.Value
@@ -332,7 +333,6 @@ namespace backend.Controllers
             }
             else
             {
-                // FALLBACK: Fórmula Matemática de Haversine (Linha reta) caso falte chave ou acabe a cota
                 double R = 6371; 
                 double dLat = ToRadians(fila.Latitude.Value - request.LatitudeCliente);
                 double dLon = ToRadians(fila.Longitude.Value - request.LongitudeCliente);
@@ -344,7 +344,6 @@ namespace backend.Controllers
                 double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
                 distanciaKm = R * c; 
 
-                // Estimativa assumindo velocidade média urbana de 30 km/h
                 tempoDeslocamentoMinutos = (int)Math.Ceiling(distanciaKm * 2); 
             }
 
@@ -366,7 +365,7 @@ namespace backend.Controllers
             else
             {
                 int minutosRestantesParaSair = tempoEsperaFilaMinutos - tempoDeslocamentoMinutos;
-                recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes de iniciar sua locomoção.";
+                recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes di iniciar sua locomoção.";
             }
 
             return Ok(new
@@ -378,6 +377,7 @@ namespace backend.Controllers
                 deveSairAgora
             });
         }
+
         private double ToRadians(double val)
         {
             return (Math.PI / 180) * val;
@@ -393,6 +393,21 @@ namespace backend.Controllers
         // Endpoint para o cliente limpar/finalizar o card chamado da sua tela
         [HttpPost("finalizar-ticket")]
         [Authorize]
+
+        [HttpGet("acesso-privado/{codigoAcesso}")]
+        [Authorize]
+        public async Task<IActionResult> ObterFilaPrivada(string codigoAcesso)
+        {
+            var fila = await _context.Filas
+                .FirstOrDefaultAsync(f => f.Ativa && f.CodigoAcesso == codigoAcesso);
+
+            if (fila == null)
+            {
+                return NotFound(new { message = "Fila privada não encontrada ou desativada." });
+            }
+
+            return Ok(fila);
+        }
         public async Task<IActionResult> FinalizarTicket([FromBody] Dictionary<string, int> request)
         {
             if (!request.TryGetValue("atendimentoId", out int atendimentoId))
