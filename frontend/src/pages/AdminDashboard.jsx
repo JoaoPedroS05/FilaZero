@@ -211,7 +211,7 @@ export default function AdminDashboard() {
 
            <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner z-10 relative flex items-center justify-center bg-slate-50">
               {latitude !== null && longitude !== null ? (
-                <APIProvider apiKey="SUA_CHAVE_API_DO_GOOGLE">
+                <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_KEY}>
                   <Map
                     defaultCenter={{ lat: latitude, lng: longitude }}
                     defaultZoom={15}
