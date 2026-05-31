@@ -79,32 +79,40 @@ export default function AdminDashboard() {
   }, []);
 
   const handleCriarFila = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  e.preventDefault();
+  setError('');
+  setSuccess('');
 
-    try {
-      await api.post('/fila', {
-        nome,
-        tipoServico,
-        tempoMedioAtendimento: parseInt(tempoMedio),
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        ehPublica,
-      });
+  try {
+    // 1. Envia para a API
+    await api.post('/fila', {
+      nome,
+      tipoServico,
+      tempoMedioAtendimento: parseInt(tempoMedio),
+      latitude: latitude ? parseFloat(latitude) : null,
+      longitude: longitude ? parseFloat(longitude) : null,
+      ehPublica,
+    });
 
-      setSuccess('Nova fila configurada com sucesso!');
-      setNome('');
-      setTipoServico('');
-      setTempoMedio('');
-      setEhPublica(true);
+    setSuccess('Nova fila configurada com sucesso!');
+    
+    // 2. Reseta os campos de texto e visibilidade
+    setNome('');
+    setTipoServico('');
+    setTempoMedio('');
+    setEhPublica(true);
 
-      const res = await api.get('/fila');
-      setFilas(res.data);
-    } catch (err) {
-      setError('Erro ao criar a fila. Verifique os dados.');
-    }
-  };
+    // Reseta as coordenadas para o ponto padrão de testes 
+    setLatitude(-8.0542);
+    setLongitude(-34.8813);
+
+    // 3. Atualiza a lista de filas para refletir no painel
+    const res = await api.get('/fila');
+    setFilas(res.data);
+  } catch (err) {
+    setError('Erro ao criar a fila. Verifique os dados.');
+  }
+};
 
   const chamarProxima = async (filaId) => {
     setError('');
@@ -233,10 +241,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* Visualização de Auditoria de Coordenadas */}
-            <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 bg-slate-50 p-2 rounded-lg border">
-              <div>Lat: {latitude.toFixed(4)}</div>
-              <div>Lng: {longitude.toFixed(4)}</div>
-            </div>
+            {latitude !== null && longitude !== null && (
+              <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 bg-slate-50 p-2 rounded-lg border animate-fade-in">
+                <div>Lat: {latitude.toFixed(4)}</div>
+                <div>Lng: {longitude.toFixed(4)}</div>
+              </div>
+            )}
           </div>
 
           <button
@@ -371,7 +381,7 @@ export default function AdminDashboard() {
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-200 flex justify-center items-center mx-auto w-fit">
               <QRCodeSVG
-                value={`http://localhost:5173/entrar-fila/${filaSelecionadaQr.codigoAcesso}`}
+                value={`http://localhost:5173/entrar-fila/${filaSelecionadaQr.codigoAcesso}`} 
                 size={160}
               />
             </div>
