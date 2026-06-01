@@ -11,6 +11,12 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace backend.Controllers
 {
+    // Criando o DTO seguro para evitar quebras de tipos primitivos no JSON
+    public class FinalizarTicketDto
+    {
+        public int AtendimentoId { get; set; }
+    }
+
     [ApiController]
     [Route("api/[controller]")]
     public class FilaController : ControllerBase
@@ -39,9 +45,7 @@ namespace backend.Controllers
                 Latitude = request.Latitude,   
                 Longitude = request.Longitude, 
                 Ativa = true,
-                
                 EhPublica = request.EhPublica, 
-                // Se for privada, gera um código aleatório de 8 caracteres para o QR Code, se for pública fica vazio
                 CodigoAcesso = !request.EhPublica ? Guid.NewGuid().ToString().Substring(0, 8) : string.Empty
             };
 
@@ -63,10 +67,8 @@ namespace backend.Controllers
                 return NotFound(new { message = "Fila não encontrada." });
             }
 
-            // Exclusão lógica: desativa a fila para novas senhas
             fila.Ativa = false;
 
-            // Cancela em lote todos os atendimentos que ainda estavam aguardando nessa fila
             var atendimentosAtivos = await _context.Atendimentos
                 .Where(a => a.FilaId == id && a.Status == "Aguardando")
                 .ToListAsync();
@@ -90,7 +92,6 @@ namespace backend.Controllers
         [Authorize]
         public async Task<IActionResult> SairDaFila([FromBody] EntrarFilaDto request)
         {
-            // Extrai id do usuário do token JWT autenticado
             var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(usuarioIdClaim))
             {
@@ -98,7 +99,6 @@ namespace backend.Controllers
             }
             int usuarioId = int.Parse(usuarioIdClaim);
 
-            // Busca o atendimento ativo deste usuário nesta fila
             var atendimentoUsuario = await _context.Atendimentos
                 .FirstOrDefaultAsync(a => a.FilaId == request.FilaId && a.UsuarioId == usuarioId && a.Status == "Aguardando");
 
@@ -109,11 +109,9 @@ namespace backend.Controllers
 
             int posicaoRemovida = atendimentoUsuario.Posicao;
 
-            // Altera o status para Cancelado
             atendimentoUsuario.Status = "Cancelado";
             atendimentoUsuario.Posicao = 0;
 
-            // Reordena e subtrai 1 da posição de todo mundo que estava atrás dele na fila
             var pessoasAtras = await _context.Atendimentos
                 .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando" && a.Posicao > posicaoRemovida)
                 .ToListAsync();
@@ -124,8 +122,6 @@ namespace backend.Controllers
             }
 
             await _context.SaveChangesAsync();
-
-            // Avisa via SignalR para o front recalcular as posições na tela em tempo real
             await _hubContext.Clients.All.SendAsync("AtualizarFila", request.FilaId);
 
             return Ok(new { message = "Você saiu da fila com sucesso." });
@@ -135,9 +131,7 @@ namespace backend.Controllers
         [HttpGet]
         public async Task<IActionResult> ListarFilas()
         {
-            var filas = await _context.Filas
-            .Where(f => f.Ativa)
-            .ToListAsync();
+            var filas = await _context.Filas.Where(f => f.Ativa).ToListAsync();
             return Ok(filas);
         }
 
@@ -154,14 +148,12 @@ namespace backend.Controllers
         [Authorize]
         public async Task<IActionResult> EntrarNaFila([FromBody] EntrarFilaDto request)
         {
-            // 1. Validar se a fila existe e está ativa
             var fila = await _context.Filas.FindAsync(request.FilaId);
             if (fila == null || !fila.Ativa)
             {
                 return BadRequest(new { message = "Esta fila não está disponível para atendimento." });
             }
 
-            // 2. Extrair o ID do Usuário do Token JWT autenticado
             var usuarioIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (string.IsNullOrEmpty(usuarioIdClaim))
             {
@@ -169,7 +161,6 @@ namespace backend.Controllers
             }
             int usuarioId = int.Parse(usuarioIdClaim);
 
-            // 3. Verificar se o usuário já está aguardando nesta mesma fila (evita duplicidade)
             var jaEstaNaFila = await _context.Atendimentos
                 .AnyAsync(a => a.FilaId == request.FilaId && a.UsuarioId == usuarioId && a.Status == "Aguardando");
                 
@@ -178,21 +169,17 @@ namespace backend.Controllers
                 return BadRequest(new { message = "Você já possui uma senha ativa nesta fila." });
             }
 
-            // 4. Calcular o número da próxima senha para esta fila específica
-            int totalAtendimentosFila = await _context.Atendimentos
-                .CountAsync(a => a.FilaId == request.FilaId);
+            int totalAtendimentosFila = await _context.Atendimentos.CountAsync(a => a.FilaId == request.FilaId);
             
             int proximoNumero = totalAtendimentosFila + 1;
             string prefixo = fila.Nome.Length >= 3 ? fila.Nome.Substring(0, 3).ToUpper() : "FIL";
             string senhaGerada = $"{prefixo}-{proximoNumero:D3}";
 
-            // 5. Calcular a posição atual do usuário (quantas pessoas estão com status "Aguardando")
             int pessoasNaFrente = await _context.Atendimentos
                 .CountAsync(a => a.FilaId == request.FilaId && a.Status == "Aguardando");
             
             int posicaoAtual = pessoasNaFrente + 1;
 
-            // 6. Criar e salvar o registro do Atendimento
             var novoAtendimento = new Atendimento
             {
                 FilaId = request.FilaId,
@@ -263,7 +250,6 @@ namespace backend.Controllers
         [HttpPost("chamar-proxima")]
         public async Task<IActionResult> ChamarProximaSenha([FromBody] ChamarSenhaDto request)
         {
-            // 1. Buscar o próximo atendimento com status "Aguardando" para a fila informada
             var proximoAtendimento = await _context.Atendimentos
                 .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando")
                 .OrderBy(a => a.DataHoraEntrada)
@@ -274,19 +260,16 @@ namespace backend.Controllers
                 return NotFound(new { message = "Não há nenhuma senha aguardando nesta fila." });
             }
 
-            // 2. Buscar o guichê para podermos mandar o nome/número dele no painel do cliente
             var guiche = await _context.Guiches.FindAsync(request.GuicheId);
             if (guiche == null || !guiche.Ativo)
             {
                 return BadRequest(new { message = "O guichê selecionado não está ativo ou não existe." });
             }
 
-            // 3. Vincular o guichê e mudar o status para "Chamado"
             proximoAtendimento.Status = "Chamado";
             proximoAtendimento.GuicheId = request.GuicheId;
             proximoAtendimento.DataHoraAtendimento = DateTime.UtcNow;
 
-            // 4. Atualizar a posição de todos os outros que ainda estão esperando
             var restantes = await _context.Atendimentos
                 .Where(a => a.FilaId == request.FilaId && a.Status == "Aguardando")
                 .ToListAsync();
@@ -301,7 +284,6 @@ namespace backend.Controllers
 
             await _context.SaveChangesAsync();
 
-            // 5. Notificar via SignalR incluindo o local exato do guichê para onde o cliente deve ir!
             await _hubContext.Clients.All.SendAsync("SenhaChamada", new { 
                 senha = proximoAtendimento.Senha, 
                 filaId = request.FilaId,
@@ -313,7 +295,7 @@ namespace backend.Controllers
             return Ok(new { message = $"Senha {proximoAtendimento.Senha} chamada no {guiche.NumeroOuNome}!", atendimento = proximoAtendimento });
         }
 
-        // 3. Endpoint de Cálculo Preditivo de Locomoção (Híbrido: Google Maps Matrix + Fallback Haversine)
+        // Endpoint de Cálculo Preditivo de Locomoção
         [HttpPost("calcular-deslocamento")]
         [Authorize]
         public async Task<IActionResult> CalcularDeslocamento([FromBody] CalcularDeslocamentoDto request)
@@ -381,7 +363,7 @@ namespace backend.Controllers
             else
             {
                 int minutosRestantesParaSair = tempoEsperaFilaMinutos - tempoDeslocamentoMinutos;
-                recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes di iniciar sua locomoção.";
+                recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes de iniciar sua locomoção.";
             }
 
             return Ok(new
@@ -406,10 +388,6 @@ namespace backend.Controllers
             return Ok(guiches);
         }
 
-        // Endpoint para o cliente limpar/finalizar o card chamado da sua tela
-        [HttpPost("finalizar-ticket")]
-        [Authorize]
-
         [HttpGet("acesso-privado/{codigoAcesso}")]
         [Authorize]
         public async Task<IActionResult> ObterFilaPrivada(string codigoAcesso)
@@ -424,20 +402,23 @@ namespace backend.Controllers
 
             return Ok(fila);
         }
-        public async Task<IActionResult> FinalizarTicket([FromBody] Dictionary<string, int> request)
+
+        // Endpoint parametrizado de forma robusta e independente
+        [HttpPost("finalizar-ticket")]
+        [Authorize]
+        public async Task<IActionResult> FinalizarTicket([FromBody] FinalizarTicketDto request)
         {
-            if (!request.TryGetValue("atendimentoId", out int atendimentoId))
+            if (request == null || request.AtendimentoId <= 0)
             {
-                return BadRequest(new { message = "O ID do atendimento é obrigatório." });
+                return BadRequest(new { message = "O ID do atendimento é obrigatório e deve ser válido." });
             }
 
-            var atendimento = await _context.Atendimentos.FindAsync(atendimentoId);
+            var atendimento = await _context.Atendimentos.FindAsync(request.AtendimentoId);
             if (atendimento == null)
             {
                 return NotFound(new { message = "Ticket não encontrado." });
             }
 
-            // Altera o status para tirá-lo do fluxo ativo
             atendimento.Status = "Finalizado";
             await _context.SaveChangesAsync();
 

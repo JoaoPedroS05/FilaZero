@@ -29,7 +29,7 @@ export default function Registro() {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Criar Conta</h2>
-          <p className="text-slate-500 mt-2">Cadastre-se no FilaZero para acessar as filas virtuais</p>
+          <p className="text-slate-500 mt-2">Cadastre-se no SemFila para acessar as filas virtuais</p>
         </div>
 
         {error && (

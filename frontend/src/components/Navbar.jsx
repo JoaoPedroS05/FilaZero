@@ -26,7 +26,7 @@ export default function Navbar() {
   return (
     <nav className="bg-white shadow-sm border-b border-slate-100 px-6 py-4 flex justify-between items-center">
       <Link to="/filas" className="text-xl font-black text-blue-600 tracking-tight">
-        FilaZero
+        SemFila
       </Link>
       
       <div className="flex gap-4 text-sm font-semibold items-center">
