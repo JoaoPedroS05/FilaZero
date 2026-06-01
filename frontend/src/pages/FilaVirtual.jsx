@@ -266,18 +266,26 @@ export default function FilaVirtual() {
                         </button>
                       ) : (
                         <button
-                          onClick={async () => {
-                            try {
-                              await api.post(`/fila/finalizar-ticket`, { atendimentoId: ticket.id });
-                              carregarDados();
-                            } catch (err) {
-                              carregarDados();
-                            }
-                          }}
-                          className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer uppercase tracking-wider shadow-sm text-center block"
-                        >
-                          ✓ Entendi, Limpar Painel
-                        </button>
+                        
+  onClick={async () => {
+    try {
+      // Envia a requisição garantindo que o ID se transformou em um inteiro nativo do JavaScript
+      await api.post('/fila/finalizar-ticket', { 
+        atendimentoId: Number(ticket.id) 
+      });
+      
+      // Sucesso! Atualiza o painel
+      carregarDados();
+    } catch (err) {
+      console.error("Erro ao finalizar ticket no painel:", err);
+      // Mantém o fallback para limpar a tela visualmente se necessário
+      carregarDados();
+    }
+  }}
+  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer uppercase tracking-wider shadow-sm text-center block"
+>
+  ✓ Entendi, Limpar Painel
+</button>
                       )}
                     </div>
 
@@ -290,7 +298,7 @@ export default function FilaVirtual() {
                         </p>
                       </div>
                       
-                      {/* ⏳ O TIMER REGRESSIVO VIVO APLICADO À ATENDIMENTO/ESPERA DA FILA */}
+                      {/* O TIMER REGRESSIVO VIVO APLICADO À ATENDIMENTO/ESPERA DA FILA */}
                       <div className="text-right">
                         <p className="text-slate-400 text-xs">Tempo Estimado de Espera</p>
                         <p className={`font-mono font-bold text-base ${ticket.status === 'Chamado' ? 'text-amber-600' : 'text-emerald-600'}`}>
