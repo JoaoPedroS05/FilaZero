@@ -381,7 +381,7 @@ namespace backend.Controllers
             else
             {
                 int minutosRestantesParaSair = tempoEsperaFilaMinutos - tempoDeslocamentoMinutos;
-                recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes di iniciar sua locomoção.";
+                recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes de iniciar sua locomoção.";
             }
 
             return Ok(new
