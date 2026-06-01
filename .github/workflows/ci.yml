@@ -1,0 +1,50 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  #JOB 1: Validar e Compilar o Backend (.NET)
+  backend-ci:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Baixar o código do repositório
+      uses: actions/checkout@v4
+
+    - name: Configurar o ambiente .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x' 
+
+    - name: Restaurar as dependências (NuGet)
+      run: dotnet restore
+      working-directory: ./backend
+
+    - name: Compilar o projeto (Build)
+      run: dotnet build --no-restore --configuration Release
+      working-directory: ./backend
+
+  # JOB 2: Validar e Compilar o Frontend (React + Vite)
+  frontend-ci:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Baixar o código do repositório
+      uses: actions/checkout@v4
+
+    - name: Configurar o ambiente Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' 
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+
+    - name: Instalar as dependências (node_modules)
+      run: npm ci
+      working-directory: ./frontend
+
+    - name: Verificar erros de compilação (Vite Build)
+      run: npm run build
+      working-directory: ./frontend
