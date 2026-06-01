@@ -1,8 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // Geralmente é https://localhost:7001 ou http://localhost:5000
-  baseURL: 'http://localhost:5033/api',
+  // Tenta ler a variável injetada pelo Docker/Vite. 
+  // Se ela não existir (rodando fora do Docker), usa o seu fallback padrão automaticamente.
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5033/api',
   headers: {
     'Content-Type': 'application/json',
   },

@@ -10,7 +10,7 @@ namespace backend.Services
         public GoogleMapsService(HttpClient httpClient, IConfiguration configuration)
         {
             _httpClient = httpClient;
-            _apiKey = configuration["GoogleMapsSettings:ApiKey"]!;
+            _apiKey = configuration["GoogleMaps:ApiKey"]!;
         }
 
         public async Task<(int? tempoMinutos, double? distanciaKm)> CalcularTempoEDistancia(double originLat, double originLng, double destLat, double destLng)

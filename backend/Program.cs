@@ -16,10 +16,10 @@ builder.Services.AddDbContext<DataContext>(options =>
     )
 );
 
-// --- 1. REGISTRO DO SERVIÇO DE CORS ---
+// --- 1. REGISTRO DO SERVIÇO DE CORS (Rebatizado para SemFila) ---
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("FilaZeroPolicy", policy =>
+    options.AddPolicy("SemFilaPolicy", policy =>
     {
         policy.WithOrigins("http://localhost:5173")
               .AllowAnyHeader()
@@ -31,7 +31,13 @@ builder.Services.AddCors(options =>
 // --- 2. REGISTRO DO SIGNALR ---
 builder.Services.AddSignalR();
 
-var chave = Encoding.ASCII.GetBytes(builder.Configuration["JwtSettings:Secret"]!);
+var secretKey = builder.Configuration["JwtSettings:Secret"];
+if (string.IsNullOrEmpty(secretKey))
+{
+    throw new InvalidOperationException("A chave JWT (JwtSettings:Secret) não foi configurada.");
+}
+
+var chave = Encoding.ASCII.GetBytes(secretKey);
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -58,6 +64,26 @@ builder.Services.AddScoped<GoogleMapsService>();
 
 var app = builder.Build();
 
+// Execução automática de Migrations ao subir o Container Docker
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<DataContext>();
+        // Verifica se o banco existe e aplica as tabelas automaticamente
+        if (context.Database.GetPendingMigrations().Any())
+        {
+            context.Database.Migrate();
+            Console.WriteLine("SemFila: Migrations aplicadas com sucesso no banco de dados!");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Erro ao aplicar migrations automaticamente: {ex.Message}");
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -67,7 +93,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 // --- 3. ATIVAÇÃO DO MIDDLEWARE DE CORS ---
-app.UseCors("FilaZeroPolicy");
+app.UseCors("SemFilaPolicy");
 
 app.UseAuthentication(); 
 app.UseAuthorization();

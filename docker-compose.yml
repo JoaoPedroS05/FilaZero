@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # 🗄️ Banco de Dados MySQL
+  banco-semfila:
+    image: mysql:8.0
+    container_name: semfila_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'filazero_db'
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - '3306:3306'
+    volumes:
+      - dados_mysql:/var/lib/mysql
+
+  # 🚀 Backend API (.NET 8)
+  api-semfila:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: semfila_api
+    restart: always
+    ports:
+      - '5033:5033'
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=banco-semfila;Database=filazero_db;Uid=root;Pwd={MYSQL_ROOT_PASSWORD};
+      - JwtSettings__Secret=${JWT_SECRET}
+      - GoogleMapsSettings__ApiKey=${GOOGLE_MAPS_KEY}
+    depends_on:
+      - banco-semfila
+
+  # 🎨 Frontend (React + Vite)
+  web-semfila:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: semfila_web
+    restart: always
+    ports:
+      - '5173:5173'
+    depends_on:
+      - api-semfila
+
+volumes:
+  dados_mysql:
