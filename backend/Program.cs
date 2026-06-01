@@ -16,15 +16,15 @@ builder.Services.AddDbContext<DataContext>(options =>
     )
 );
 
-// --- 1. REGISTRO DO SERVIÇO DE CORS (Rebatizado para SemFila) ---
+// --- 1. REGISTRO DO SERVIÇO DE CORS ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("SemFilaPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5173") // Sem barra "/" no final
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials();
+              .AllowCredentials(); // Obrigatório para o funcionamento do SignalR
     });
 });
 
@@ -71,7 +71,6 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<DataContext>();
-        // Verifica se o banco existe e aplica as tabelas automaticamente
         if (context.Database.GetPendingMigrations().Any())
         {
             context.Database.Migrate();
@@ -90,10 +89,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
-// --- 3. ATIVAÇÃO DO MIDDLEWARE DE CORS ---
+// --- 3. ATIVAÇÃO DO MIDDLEWARE DE CORS (MOVIDO PARA O TOPO) ---
+// Deve rodar ANTES de qualquer redirecionamento, autenticação ou roteamento.
 app.UseCors("SemFilaPolicy");
+
+// No Docker local, se você não configurou certificados SSL, o Redirection pode quebrar requisições do front.
+// Colocando-o após o CORS garante que, se ele agir, os cabeçalhos de CORS já foram anexados.
+app.UseHttpsRedirection();
 
 app.UseAuthentication(); 
 app.UseAuthorization();

@@ -57,7 +57,7 @@ namespace backend.Controllers
             // 1. Busca o usuário pelo e-mail
             var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == request.Email);
             
-            // 2. Valida o usuário e a senha criptografada (Critério: Mensagem de erro para login inválido)
+            // 2. Valida o usuário e a senha criptografada
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
             {
                 return Unauthorized(new { message = "E-mail ou senha inválidos." });
@@ -75,7 +75,22 @@ namespace backend.Controllers
         private string GerarTokenJwt(Usuario usuario)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var chave = Encoding.ASCII.GetBytes(_configuration["JwtSettings:Secret"]!);
+            
+            // Tratamento preventivo para garantir que a chave JWT exista
+            var secretKey = _configuration["JwtSettings:Secret"];
+            if (string.IsNullOrEmpty(secretKey))
+            {
+                throw new InvalidOperationException("Erro Interno: A chave 'JwtSettings:Secret' não foi mapeada no ambiente.");
+            }
+            
+            var chave = Encoding.ASCII.GetBytes(secretKey);
+
+            // SEGURANÇA CONTRA ERRO 500: Tenta ler a configuração, se não achar, assume 60 minutos padrão
+            var expirySetting = _configuration["JwtSettings:ExpiryInMinutes"];
+            if (!double.TryParse(expirySetting, out double expiryMinutes))
+            {
+                expiryMinutes = 60; // Fallback seguro para não derrubar a API se o Docker esquecer o valor
+            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -84,9 +99,9 @@ namespace backend.Controllers
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Name, usuario.Nome),
                     new Claim(ClaimTypes.Email, usuario.Email),
-                    new Claim(ClaimTypes.Role, usuario.Role)
+                    new Claim(ClaimTypes.Role, usuario.Role ?? "User") // Evita nulo caso a Role não venha preenchida
                 }),
-                Expires = DateTime.UtcNow.AddMinutes(double.Parse(_configuration["JwtSettings:ExpiryInMinutes"]!)),
+                Expires = DateTime.UtcNow.AddMinutes(expiryMinutes), // Mapeado de forma segura
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)
             };
 
