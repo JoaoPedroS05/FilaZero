@@ -211,7 +211,7 @@ export default function FilaVirtual() {
 
         {/* Cabeçalho */}
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">FilaZero</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">SemFila</h1>
           <p className="text-slate-500 text-sm">
             Acompanhe seus agendamentos ou consulte o tempo de locomoção local
           </p>
