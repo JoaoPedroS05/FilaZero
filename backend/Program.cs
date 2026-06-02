@@ -9,12 +9,10 @@ using Microsoft.IdentityModel.Tokens;
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuração do MySQL
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<DataContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
-    )
-);
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 0))));
 
 builder.Services.AddStackExchangeRedisCache(options =>
 {
@@ -74,18 +72,24 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
+    var context = services.GetRequiredService<DataContext>();
+
     try
     {
-        var context = services.GetRequiredService<DataContext>();
-        if (context.Database.GetPendingMigrations().Any())
+        // Só aplica migrations se NÃO for um banco em memória (InMemory)
+        if (context.Database.IsRelational())
         {
             context.Database.Migrate();
-            Console.WriteLine("SemFila: Migrations aplicadas com sucesso no banco de dados!");
+        }
+        else
+        {
+            // Garante que a estrutura virtual em memória seja gerada sem estourar exceções relacionais
+            context.Database.EnsureCreated();
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Erro ao aplicar migrations automaticamente: {ex.Message}");
+        Console.WriteLine($"Erro ao inicializar o banco: {ex.Message}");
     }
 }
 
@@ -112,3 +116,4 @@ app.MapControllers();
 app.MapHub<FilaHub>("/hub/fila");
 
 app.Run();
+public partial class Program { }
