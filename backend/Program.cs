@@ -16,15 +16,21 @@ builder.Services.AddDbContext<DataContext>(options =>
     )
 );
 
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "SemFila_";
+});
+
 // --- 1. REGISTRO DO SERVIÇO DE CORS ---
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("SemFilaPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173") // Sem barra "/" no final
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials(); // Obrigatório para o funcionamento do SignalR
+              .AllowAnyMethod();
+              //.AllowCredentials();
     });
 });
 

@@ -36,12 +36,13 @@ namespace backend.Controllers
             // 2. Criptografia da senha usando BCrypt
             string senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
 
-            // 3. Criação do objeto do usuário
+            // 3. Criação do objeto do usuário (Lendo com segurança o novo campo do DTO)
             var novoUsuario = new Usuario
             {
                 Nome = request.Nome,
                 Email = request.Email,
-                SenhaHash = senhaHash
+                SenhaHash = senhaHash,
+                Role = string.IsNullOrEmpty(request.Role) ? "User" : request.Role
             };
 
             // 4. Salvar no MySQL via EF Core
@@ -76,7 +77,6 @@ namespace backend.Controllers
         {
             var tokenHandler = new JwtSecurityTokenHandler();
             
-            // Tratamento preventivo para garantir que a chave JWT exista
             var secretKey = _configuration["JwtSettings:Secret"];
             if (string.IsNullOrEmpty(secretKey))
             {
@@ -85,11 +85,10 @@ namespace backend.Controllers
             
             var chave = Encoding.ASCII.GetBytes(secretKey);
 
-            // SEGURANÇA CONTRA ERRO 500: Tenta ler a configuração, se não achar, assume 60 minutos padrão
             var expirySetting = _configuration["JwtSettings:ExpiryInMinutes"];
             if (!double.TryParse(expirySetting, out double expiryMinutes))
             {
-                expiryMinutes = 60; // Fallback seguro para não derrubar a API se o Docker esquecer o valor
+                expiryMinutes = 60; 
             }
 
             var tokenDescriptor = new SecurityTokenDescriptor
@@ -99,9 +98,10 @@ namespace backend.Controllers
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Name, usuario.Nome),
                     new Claim(ClaimTypes.Email, usuario.Email),
-                    new Claim(ClaimTypes.Role, usuario.Role ?? "User") // Evita nulo caso a Role não venha preenchida
+                    new Claim(ClaimTypes.Role, usuario.Role ?? "User") 
                 }),
-                Expires = DateTime.UtcNow.AddMinutes(expiryMinutes), // Mapeado de forma segura
+                // 🔥 Mudado para DateTime.UtcNow explicitamente em formato universal do JWT
+                Expires = DateTime.UtcNow.AddMinutes(expiryMinutes), 
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)
             };
 
