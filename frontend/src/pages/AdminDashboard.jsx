@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { QRCodeSVG } from 'qrcode.react';
@@ -19,7 +20,7 @@ export default function AdminDashboard() {
   const [success, setSuccess] = useState('');
   const [senhaChamada, setSenhaChamada] = useState('');
 
-  const [latitude, setLatitude] = useState(null);  
+  const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
 
   const [modalAberto, setModalAberto] = useState(false);
@@ -41,11 +42,11 @@ export default function AdminDashboard() {
     try {
       const [resFilas, resGuiches] = await Promise.all([
         api.get('/fila'),
-        api.get('/fila/guiches') 
+        api.get('/fila/guiches')
       ]);
       setFilas(resFilas.data);
       setGuiches(resGuiches.data);
-      
+
       if (resGuiches.data.length > 0 && !guicheSelecionado) {
         setGuicheSelecionado(resGuiches.data[0].id);
       }
@@ -79,40 +80,40 @@ export default function AdminDashboard() {
   }, []);
 
   const handleCriarFila = async (e) => {
-  e.preventDefault();
-  setError('');
-  setSuccess('');
+    e.preventDefault();
+    setError('');
+    setSuccess('');
 
-  try {
-    // 1. Envia para a API
-    await api.post('/fila', {
-      nome,
-      tipoServico,
-      tempoMedioAtendimento: parseInt(tempoMedio),
-      latitude: latitude ? parseFloat(latitude) : null,
-      longitude: longitude ? parseFloat(longitude) : null,
-      ehPublica,
-    });
+    try {
+      // 1. Envia para a API
+      await api.post('/fila', {
+        nome,
+        tipoServico,
+        tempoMedioAtendimento: parseInt(tempoMedio),
+        latitude: latitude ? parseFloat(latitude) : null,
+        longitude: longitude ? parseFloat(longitude) : null,
+        ehPublica,
+      });
 
-    setSuccess('Nova fila configurada com sucesso!');
-    
-    // 2. Reseta os campos de texto e visibilidade
-    setNome('');
-    setTipoServico('');
-    setTempoMedio('');
-    setEhPublica(true);
+      setSuccess('Nova fila configurada com sucesso!');
 
-    // Reseta as coordenadas para o ponto padrão de testes 
-    setLatitude(-8.0542);
-    setLongitude(-34.8813);
+      // 2. Reseta os campos de texto e visibilidade
+      setNome('');
+      setTipoServico('');
+      setTempoMedio('');
+      setEhPublica(true);
 
-    // 3. Atualiza a lista de filas para refletir no painel
-    const res = await api.get('/fila');
-    setFilas(res.data);
-  } catch (err) {
-    setError('Erro ao criar a fila. Verifique os dados.');
-  }
-};
+      // Reseta as coordenadas para o ponto padrão de testes 
+      setLatitude(-8.0542);
+      setLongitude(-34.8813);
+
+      // 3. Atualiza a lista de filas para refletir no painel
+      const res = await api.get('/fila');
+      setFilas(res.data);
+    } catch (err) {
+      setError('Erro ao criar a fila. Verifique os dados.');
+    }
+  };
 
   const chamarProxima = async (filaId) => {
     setError('');
@@ -217,7 +218,7 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-           <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner z-10 relative flex items-center justify-center bg-slate-50">
+            <div className="w-full h-48 rounded-xl overflow-hidden border border-slate-200 shadow-inner z-10 relative flex items-center justify-center bg-slate-50">
               {latitude !== null && longitude !== null ? (
                 <APIProvider apiKey={import.meta.env.VITE_GOOGLE_MAPS_KEY}>
                   <Map
@@ -373,7 +374,7 @@ export default function AdminDashboard() {
       {/* MODAL FLUTUANTE DE QR CODE */}
       {modalAberto && filaSelecionadaQr && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center space-y-4 border border-slate-100">
+          <div data-testid="qr-modal" className="bg-white p-6 rounded-3xl shadow-2xl max-w-sm w-full text-center space-y-4 border border-slate-100">
             <div>
               <h3 className="text-lg font-black text-slate-900">{filaSelecionadaQr.nome}</h3>
               <p className="text-xs text-slate-400 mt-1">Totem de Autoatendimento Local</p>
@@ -381,7 +382,7 @@ export default function AdminDashboard() {
 
             <div className="bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-200 flex justify-center items-center mx-auto w-fit">
               <QRCodeSVG
-                value={`http://localhost:5173/entrar-fila/${filaSelecionadaQr.codigoAcesso}`} 
+                value={`http://localhost:5173/entrar-fila/${filaSelecionadaQr.codigoAcesso}`}
                 size={160}
               />
             </div>

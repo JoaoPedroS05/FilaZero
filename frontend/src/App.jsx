@@ -1,3 +1,4 @@
+import React from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login.jsx';
 import Register from './pages/Registro.jsx';
@@ -46,7 +47,7 @@ const AdminRoute = ({ children }) => {
 };
 
 // Maestro de Rotas Unificado
-function AppRoutes() {
+export function AppRoutes() {
   const { loading, authenticated } = useAuth();
 
   // 🔥 SOLUÇÃO DA TRAVA: Se o React ainda estiver lendo o localStorage/JWT, 
