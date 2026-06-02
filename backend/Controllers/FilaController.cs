@@ -8,10 +8,11 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 
 namespace backend.Controllers
 {
-    // Criando o DTO seguro para evitar quebras de tipos primitivos no JSON
     public class FinalizarTicketDto
     {
         public int AtendimentoId { get; set; }
@@ -24,15 +25,21 @@ namespace backend.Controllers
         private readonly DataContext _context;
         private readonly IHubContext<FilaHub> _hubContext;
         private readonly GoogleMapsService _googleMapsService;
+        private readonly IDistributedCache _cache;
 
-        public FilaController(DataContext context, IHubContext<FilaHub> hubContext, GoogleMapsService googleMapsService)
+        // Construtor corrigido com a injeção do cache do Redis
+        public FilaController(
+            DataContext context, 
+            IHubContext<FilaHub> hubContext, 
+            GoogleMapsService googleMapsService, 
+            IDistributedCache cache)
         {
             _context = context;
             _hubContext = hubContext;
             _googleMapsService = googleMapsService;
+            _cache = cache;
         }
 
-        // Endpoint para criar uma nova fila
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CriarFila([FromBody] CriarFilaDto request)
@@ -56,7 +63,6 @@ namespace backend.Controllers
             return Ok(new { message = "Fila de atendimento criada com sucesso!", fila = novaFila });
         }
 
-        // Endpoint para o Admin desativar/remover uma fila
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> RemoverFila(int id)
@@ -87,7 +93,6 @@ namespace backend.Controllers
             return Ok(new { message = $"Fila '{fila.Nome}' e seus atendimentos ativos foram encerrados com sucesso." });
         }
 
-        // Endpoint para o Cliente desistir/sair da fila
         [HttpPost("sair")]
         [Authorize]
         public async Task<IActionResult> SairDaFila([FromBody] EntrarFilaDto request)
@@ -127,7 +132,6 @@ namespace backend.Controllers
             return Ok(new { message = "Você saiu da fila com sucesso." });
         }
        
-        // Endpoint para listar apenas as filas ativas que são públicas
         [HttpGet]
         public async Task<IActionResult> ListarFilas()
         {
@@ -295,11 +299,19 @@ namespace backend.Controllers
             return Ok(new { message = $"Senha {proximoAtendimento.Senha} chamada no {guiche.NumeroOuNome}!", atendimento = proximoAtendimento });
         }
 
-        // Endpoint de Cálculo Preditivo de Locomoção
         [HttpPost("calcular-deslocamento")]
         [Authorize]
         public async Task<IActionResult> CalcularDeslocamento([FromBody] CalcularDeslocamentoDto request)
         {
+            string cacheKey = $"deslocamento:{request.AtendimentoId}";
+            
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrEmpty(cachedData))
+            {
+                var resultadoCacheado = JsonSerializer.Deserialize<object>(cachedData);
+                return Ok(resultadoCacheado);
+            }
+
             var atendimento = await _context.Atendimentos
                 .Include(a => a.Fila)
                 .FirstOrDefaultAsync(a => a.Id == request.AtendimentoId && a.Status == "Aguardando");
@@ -310,7 +322,6 @@ namespace backend.Controllers
             }
 
             var fila = atendimento.Fila;
-
             if (!fila.Latitude.HasValue || !fila.Longitude.HasValue)
             {
                 return BadRequest(new { message = "Este estabelecimento não possui coordenadas configuradas." });
@@ -334,19 +345,15 @@ namespace backend.Controllers
                 double R = 6371; 
                 double dLat = ToRadians(fila.Latitude.Value - request.LatitudeCliente);
                 double dLon = ToRadians(fila.Longitude.Value - request.LongitudeCliente);
-
                 double a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
-                           Math.Cos(ToRadians(request.LatitudeCliente)) * Math.Cos(ToRadians(fila.Latitude.Value)) *
-                           Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-                           
+                        Math.Cos(ToRadians(request.LatitudeCliente)) * Math.Cos(ToRadians(fila.Latitude.Value)) *
+                        Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
                 double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
                 distanciaKm = R * c; 
-
                 tempoDeslocamentoMinutos = (int)Math.Ceiling(distanciaKm * 2); 
             }
 
             int tempoEsperaFilaMinutos = atendimento.Posicao * fila.TempoMedioAtendimento;
-
             string recomendacao;
             bool deveSairAgora = false;
 
@@ -366,14 +373,23 @@ namespace backend.Controllers
                 recomendacao = $"Fique tranquilo. Você pode aguardar mais {minutosRestantesParaSair} minutos antes de iniciar sua locomoção.";
             }
 
-            return Ok(new
+            var respostaFinal = new
             {
                 distanciaKm = Math.Round(distanciaKm, 2),
                 tempoDeslocamentoMinutos,
                 tempoEsperaFilaMinutos,
                 recomendacao,
                 deveSairAgora
-            });
+            };
+
+            var cacheOptions = new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(3)
+            };
+            
+            await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(respostaFinal), cacheOptions);
+
+            return Ok(respostaFinal);
         }
 
         private double ToRadians(double val)
@@ -403,7 +419,6 @@ namespace backend.Controllers
             return Ok(fila);
         }
 
-        // Endpoint parametrizado de forma robusta e independente
         [HttpPost("finalizar-ticket")]
         [Authorize]
         public async Task<IActionResult> FinalizarTicket([FromBody] FinalizarTicketDto request)
