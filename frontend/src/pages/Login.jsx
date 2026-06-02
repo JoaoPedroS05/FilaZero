@@ -1,39 +1,40 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Casamos o nome da função com o que o formulário chama no onSubmit
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/login', { email, senha });
+      console.log("Disparando tentativa de login para:", email);
       
-      // 1. Salva o Token JWT para autorizar as requisições da API
-      localStorage.setItem('token', response.data.token);
+      // Captura a role retornada pelo Contexto (que já vem higienizada como "Admin" ou "User")
+      const userRole = await login(email, senha);
       
-      // 2. Salva os dados do usuário (incluindo a Role) para a Navbar e as Rotas lerem
-      const dadosUsuario = response.data.usuario || response.data.user;
-      if (dadosUsuario) {
-        localStorage.setItem('usuario', JSON.stringify(dadosUsuario));
-      }
+      console.log("Login sucedido! Role retornada pelo contexto:", userRole);
 
-      // 3. Redireciona de forma limpa usando o hook do react-router-dom
-      navigate('/filas');
+      // 🔥 CORREÇÃO DE SEGURANÇA: Normaliza para minúsculo antes de comparar
+      if (userRole && userRole.trim().toLowerCase() === 'admin') {
+        console.log("Redirecionando para o painel administrativo (/admin)...");
+        navigate('/admin');
+      } else {
+        console.log("Redirecionando para a área de clientes (/filas)...");
+        navigate('/filas');
+      }
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || 'Credenciais inválidas. Tente novamente.');
-    } finally {
       setLoading(false);
+      console.error("ERRO CAPTURADO NO LOGIN:", err);
+      setError(err.response?.data?.message || err.message || "Falha na autenticação.");
     }
   };
 
@@ -46,9 +47,10 @@ export default function Login() {
           <p className="text-slate-500 text-sm mt-1">Entre para gerenciar ou emitir seus tickets</p>
         </div>
 
+        {/* Exibição visual do erro na tela */}
         {error && (
-          <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-100">
-            {error}
+          <div className="p-3 bg-red-50 text-red-700 rounded-xl text-xs font-bold border border-red-100 whitespace-pre-wrap">
+            ⚠️ {error}
           </div>
         )}
 

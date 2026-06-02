@@ -36,12 +36,13 @@ namespace backend.Controllers
             // 2. Criptografia da senha usando BCrypt
             string senhaHash = BCrypt.Net.BCrypt.HashPassword(request.Senha);
 
-            // 3. Criação do objeto do usuário
+            // 3. Criação do objeto do usuário (Lendo com segurança o novo campo do DTO)
             var novoUsuario = new Usuario
             {
                 Nome = request.Nome,
                 Email = request.Email,
-                SenhaHash = senhaHash
+                SenhaHash = senhaHash,
+                Role = string.IsNullOrEmpty(request.Role) ? "User" : request.Role
             };
 
             // 4. Salvar no MySQL via EF Core
@@ -57,7 +58,7 @@ namespace backend.Controllers
             // 1. Busca o usuário pelo e-mail
             var usuario = await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == request.Email);
             
-            // 2. Valida o usuário e a senha criptografada (Critério: Mensagem de erro para login inválido)
+            // 2. Valida o usuário e a senha criptografada
             if (usuario == null || !BCrypt.Net.BCrypt.Verify(request.Senha, usuario.SenhaHash))
             {
                 return Unauthorized(new { message = "E-mail ou senha inválidos." });
@@ -75,7 +76,20 @@ namespace backend.Controllers
         private string GerarTokenJwt(Usuario usuario)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var chave = Encoding.ASCII.GetBytes(_configuration["JwtSettings:Secret"]!);
+            
+            var secretKey = _configuration["JwtSettings:Secret"];
+            if (string.IsNullOrEmpty(secretKey))
+            {
+                throw new InvalidOperationException("Erro Interno: A chave 'JwtSettings:Secret' não foi mapeada no ambiente.");
+            }
+            
+            var chave = Encoding.ASCII.GetBytes(secretKey);
+
+            var expirySetting = _configuration["JwtSettings:ExpiryInMinutes"];
+            if (!double.TryParse(expirySetting, out double expiryMinutes))
+            {
+                expiryMinutes = 60; 
+            }
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {
@@ -84,9 +98,10 @@ namespace backend.Controllers
                     new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                     new Claim(ClaimTypes.Name, usuario.Nome),
                     new Claim(ClaimTypes.Email, usuario.Email),
-                    new Claim(ClaimTypes.Role, usuario.Role)
+                    new Claim(ClaimTypes.Role, usuario.Role ?? "User") 
                 }),
-                Expires = DateTime.UtcNow.AddMinutes(double.Parse(_configuration["JwtSettings:ExpiryInMinutes"]!)),
+                // 🔥 Mudado para DateTime.UtcNow explicitamente em formato universal do JWT
+                Expires = DateTime.UtcNow.AddMinutes(expiryMinutes), 
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(chave), SecurityAlgorithms.HmacSha256Signature)
             };
 

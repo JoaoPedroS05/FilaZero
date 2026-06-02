@@ -1,0 +1,78 @@
+services:
+  # Banco de Dados MySQL
+  banco-semfila:
+    image: mysql:8.0
+    container_name: semfila_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: "filazero_db"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - dados_mysql:/var/lib/mysql
+    # dá tempo para o MySQL inicializar os arquivos no primeiro boot
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
+      timeout: 5s
+      retries: 10
+      interval: 5s
+      start_period: 15s
+
+  # Cache de Dados (Redis)
+  cache-semfila:
+    image: redis:7-alpine
+    container_name: semfila_cache
+    restart: always
+    ports:
+      - "6379:6379"
+
+  # Backend API (.NET 8)
+  api-semfila:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: semfila_api
+    restart: always
+    ports:
+      - "5033:5033"
+    environment:
+      #  Alterado o separador de porta de vírgula para ponto e vírgula e adicionado o AllowPublicKeyRetrieval=True
+      - ConnectionStrings__DefaultConnection=Server=banco-semfila;Port=3306;Database=filazero_db;Uid=root;Pwd=${MYSQL_ROOT_PASSWORD};SslMode=None;AllowPublicKeyRetrieval=True;
+      - JwtSettings__Secret=${JWT_SECRET}
+      - JwtSettings__ExpiryInMinutes=${JWT_EXPIRY_IN_MINUTES}
+      - GoogleMapsSettings__ApiKey=${VITE_GOOGLE_MAPS_KEY}
+      - ConnectionStrings__Redis=cache-semfila:6379
+    depends_on:
+      banco-semfila:
+        condition: service_healthy
+      cache-semfila:
+        condition: service_started
+
+  # Frontend (React + Vite)
+  web-semfila:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: semfila_web
+    restart: always
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_GOOGLE_MAPS_KEY=${VITE_GOOGLE_MAPS_KEY}
+    depends_on:
+      - api-semfila
+
+volumes:
+  dados_mysql:

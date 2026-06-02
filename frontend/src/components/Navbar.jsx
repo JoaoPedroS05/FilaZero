@@ -1,70 +1,52 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 export default function Navbar() {
+  const { authenticated, user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); 
-  
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [usuario, setUsuario] = useState(JSON.parse(localStorage.getItem('usuario')));
 
-  // Fica de olho nas mudanças de rota para atualizar o estado da barra imediatamente pós-login
-  useEffect(() => {
-    setToken(localStorage.getItem('token'));
-    setUsuario(JSON.parse(localStorage.getItem('usuario')));
-  }, [location]);
-
-  const handleSair = () => {
-    localStorage.clear();
-    setToken(null);
-    setUsuario(null);
-    navigate('/login');
-  };
-
-  const isAuthenticated = !!token;
+  // Testa se existe o user e remove qualquer erro de maiúsculas/minúsculas
+  const isAdmin = authenticated &&
+    user?.role &&
+    user.role.toString().trim().toLowerCase() === 'admin';
 
   return (
-    <nav className="bg-white shadow-sm border-b border-slate-100 px-6 py-4 flex justify-between items-center">
-      <Link to="/filas" className="text-xl font-black text-blue-600 tracking-tight">
-        SemFila
-      </Link>
-      
-      <div className="flex gap-4 text-sm font-semibold items-center">
-        {/* Botão Home: Visível apenas para quem está autenticado */}
-        {isAuthenticated && (
-          <Link to="/filas" className="text-slate-600 hover:text-blue-600 transition-colors flex items-center gap-1">
-            🏠 Home
+    <nav className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
+      <div
+        className="flex items-center gap-2 font-bold text-blue-600 text-lg cursor-pointer"
+        onClick={() => navigate('/filas')}
+      >
+        <span className="tracking-tight">SemFila</span>
+      </div>
+
+      <div className="flex items-center gap-6">
+        {authenticated && (
+          <Link to="/filas" className="text-sm font-medium text-slate-600 hover:text-blue-600 transition-colors">
+            Filas Virtuais
           </Link>
         )}
 
-        {!isAuthenticated ? (
-          <>
-            <Link to="/login" className="text-slate-600 hover:text-blue-600 transition-colors">
-              Login
-            </Link>
-            <Link to="/registro" className="text-slate-600 hover:text-blue-600 transition-colors">
-              Cadastrar
-            </Link>
-          </>
-        ) : (
-          <>
-            {/* O link do Painel Admin SÓ aparece se a role for estritamente "Admin" */}
-            {usuario?.role === 'Admin' && (
-              <Link to="/admin" className="text-purple-600 hover:text-purple-700 bg-purple-50 px-3 py-1.5 rounded-xl transition-colors">
-                Painel Admin
-              </Link>
-            )}
-            
-            <span className="text-slate-300 font-normal">|</span>
-            <span className="text-slate-500 font-normal">Olá, {usuario?.nome?.split(' ')[0]}</span>
+        {/* EXIBIÇÃO DO BOTÃO DO PAINEL ADMIN */}
+        {isAdmin && (
+          <Link
+            to="/admin"
+            className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl transition-all shadow-sm"
+          >
+            Painel Admin
+          </Link>
+        )}
 
-            <button 
-              onClick={handleSair}
-              className="text-red-500 hover:text-red-600 cursor-pointer bg-none border-none font-semibold transition-colors"
-            >
-              Sair
-            </button>
-          </>
+        {authenticated ? (
+          <button
+            onClick={logout}
+            className="text-sm font-medium text-red-500 hover:text-red-600 transition-colors cursor-pointer"
+          >
+            Sair
+          </button>
+        ) : (
+          <Link to="/login" className="text-sm font-medium text-blue-600 hover:underline">
+            Entrar
+          </Link>
         )}
       </div>
     </nav>

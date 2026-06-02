@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as signalR from '@microsoft/signalr';
 import api from '../services/api';
 
@@ -11,8 +11,14 @@ export default function FilaVirtual() {
   const [dadosDeslocamento, setDadosDeslocamento] = useState({});
   const [temposRegressivos, setTemposRegressivos] = useState({});
 
-  // FIX 1: obterAnaliseDeslocamento definida no escopo do componente,
-  // não dentro do bloco try de carregarDados.
+  // Ref que rastreia se o componente ainda está montado.
+  // Impede chamadas de setState após desmontagem (ex: logout/navegação).
+  const montadoRef = useRef(true);
+  useEffect(() => {
+    montadoRef.current = true;
+    return () => { montadoRef.current = false; };
+  }, []);
+
   const obterAnaliseDeslocamento = useCallback((atendimentoId) => {
     if (!navigator.geolocation) return;
 
@@ -26,6 +32,8 @@ export default function FilaVirtual() {
             longitudeCliente: longitude
           });
 
+          if (!montadoRef.current) return;
+
           const dadosNormalizados = {
             distanciaKm: response.data.distanciaKm ?? response.data.DistanciaKm ?? '0.0',
             tempoDeslocamentoMinutos: response.data.tempoDeslocamentoMinutos ?? response.data.TempoDeslocamentoMinutos ?? '0',
@@ -38,6 +46,7 @@ export default function FilaVirtual() {
             [atendimentoId]: dadosNormalizados
           }));
         } catch (err) {
+          if (err.response?.status === 401) return; // sessão encerrada, ignorar
           console.error('Erro ao calcular deslocamento:', err);
         }
       },
@@ -45,17 +54,29 @@ export default function FilaVirtual() {
     );
   }, []);
 
-  // FIX 2: carregarDados com useCallback para referência estável no useEffect do SignalR.
   const carregarDados = useCallback(async () => {
+    // Lê o token no momento exato da chamada.
+    // Se o logout já removeu o token, aborta antes de qualquer requisição.
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('⚠️ Requisição abortada: Usuário efetuou logout.');
+      return;
+    }
+
     try {
       const [resFilas, resMeusAtendimentos] = await Promise.all([
         api.get('/fila/publicas'),
         api.get('/fila/meus-atendimentos')
       ]);
+
+      // Após o await, verifica se o componente ainda está montado antes de
+      // atualizar qualquer estado. Evita setState em componente desmontado
+      // durante logout ou navegação.
+      if (!montadoRef.current) return;
+
       setFilas(resFilas.data);
       setMeusAtendimentos(resMeusAtendimentos.data);
 
-      // FIX 3: forEach agora está corretamente fechado dentro de carregarDados.
       resMeusAtendimentos.data.forEach(ticket => {
         if (ticket.status === 'Aguardando') {
           const tempoEsperaMinutos =
@@ -88,8 +109,15 @@ export default function FilaVirtual() {
           }
         }
       });
-    } catch (err) {
-      console.error('Erro ao carregar dados:', err);
+    } catch (error) {
+      // 401 após logout é uma race condition esperada: o token foi removido
+      // entre o guard acima e o retorno da requisição. Suprime silenciosamente.
+      if (error.response?.status === 401) {
+        console.warn('Sessão finalizada ou token expirado. Ignorando 401.');
+        return;
+      }
+      if (!montadoRef.current) return;
+      console.error('Erro ao carregar dados:', error);
     }
   }, [obterAnaliseDeslocamento]);
 
@@ -155,11 +183,14 @@ export default function FilaVirtual() {
           novaConexao.on('AtualizarFila', () => carregarDados());
           novaConexao.on('FilaCriada', () => carregarDados());
           novaConexao.on('SenhaChamada', (dados) => {
+            if (!montadoRef.current) return;
             setAlertaChamada({
               senha: dados.senha,
               guicheNome: dados.guicheNome || 'Guichê Padrão'
             });
-            setTimeout(() => setAlertaChamada(null), 7000);
+            setTimeout(() => {
+              if (montadoRef.current) setAlertaChamada(null);
+            }, 7000);
           });
         }
       } catch (err) {
@@ -281,7 +312,6 @@ export default function FilaVirtual() {
                       </h3>
                     </div>
 
-                    {/* FIX 4: typeof nativo em vez da função auxiliar _typeof quebrada */}
                     {ticket.status === 'Aguardando' &&
                       typeof analise === 'object' &&
                       analise !== null && (

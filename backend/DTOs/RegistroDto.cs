@@ -15,5 +15,6 @@ namespace backend.DTOs
         [Required(ErrorMessage = "A senha é obrigatória.")]
         [StringLength(100, MinimumLength = 6, ErrorMessage = "A senha deve ter no mínimo 6 caracteres.")]
         public string Senha { get; set; } = string.Empty;
+        public string? Role { get; set; }
     }
 }

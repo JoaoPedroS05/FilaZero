@@ -16,22 +16,34 @@ builder.Services.AddDbContext<DataContext>(options =>
     )
 );
 
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "SemFila_";
+});
+
 // --- 1. REGISTRO DO SERVIÇO DE CORS ---
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("FilaZeroPolicy", policy =>
+    options.AddPolicy("SemFilaPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173")
+        policy.AllowAnyOrigin()
               .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+              .AllowAnyMethod();
+              //.AllowCredentials();
     });
 });
 
 // --- 2. REGISTRO DO SIGNALR ---
 builder.Services.AddSignalR();
 
-var chave = Encoding.ASCII.GetBytes(builder.Configuration["JwtSettings:Secret"]!);
+var secretKey = builder.Configuration["JwtSettings:Secret"];
+if (string.IsNullOrEmpty(secretKey))
+{
+    throw new InvalidOperationException("A chave JWT (JwtSettings:Secret) não foi configurada.");
+}
+
+var chave = Encoding.ASCII.GetBytes(secretKey);
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -58,16 +70,38 @@ builder.Services.AddScoped<GoogleMapsService>();
 
 var app = builder.Build();
 
+// Execução automática de Migrations ao subir o Container Docker
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<DataContext>();
+        if (context.Database.GetPendingMigrations().Any())
+        {
+            context.Database.Migrate();
+            Console.WriteLine("SemFila: Migrations aplicadas com sucesso no banco de dados!");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Erro ao aplicar migrations automaticamente: {ex.Message}");
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// --- 3. ATIVAÇÃO DO MIDDLEWARE DE CORS (MOVIDO PARA O TOPO) ---
+// Deve rodar ANTES de qualquer redirecionamento, autenticação ou roteamento.
+app.UseCors("SemFilaPolicy");
 
-// --- 3. ATIVAÇÃO DO MIDDLEWARE DE CORS ---
-app.UseCors("FilaZeroPolicy");
+// No Docker local, se você não configurou certificados SSL, o Redirection pode quebrar requisições do front.
+// Colocando-o após o CORS garante que, se ele agir, os cabeçalhos de CORS já foram anexados.
+app.UseHttpsRedirection();
 
 app.UseAuthentication(); 
 app.UseAuthorization();
